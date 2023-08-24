@@ -40,6 +40,7 @@ import { SupportTopicService } from './shared-v2/services/support-topic.service'
 import { ResourceResolver } from './home/resolvers/resource.resolver';
 import { ResourcesModule } from './resources/resources.module';
 import { WebSitesModule } from './resources/web-sites/web-sites.module';
+import { ManagedClustersDiagnosticsModule } from  './resources/container-service/managed-cluster-diagnostics.module';
 import { BackendCtrlService } from './shared/services/backend-ctrl.service';
 import { PortalActionService} from './shared/services/portal-action.service';
 import { FabricModule } from './fabric-ui/fabric.module';
@@ -57,6 +58,7 @@ import { OptInsightsService } from './shared/services/optinsights/optinsights.se
     HttpClientModule,
     ResourcesModule,
     WebSitesModule,
+    ManagedClustersDiagnosticsModule,
     SharedModule.forRoot(),
     StartupModule.forRoot(),
     DiagnosticDataModule.forRoot(environment.production ? PUBLIC_PROD_CONFIGURATION : PUBLIC_DEV_CONFIGURATION),

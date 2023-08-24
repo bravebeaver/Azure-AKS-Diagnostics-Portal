@@ -22,6 +22,11 @@ const ResourceRoutes = RouterModule.forChild([
     path: 'subscriptions/:subscriptionid/resourcegroups/:resourcegroup/providers/microsoft.web/hostingenvironments/:resourcename',
     loadChildren: () => import('./web-hosting-environments/web-hosting-environments.module').then(m => m.WebHostingEnvironmentsModule)
   },
+  // Azure kubernetes Service
+  {
+    path: 'subscriptions/:subscriptionid/resourcegroups/:resourcegroup/providers/microsoft.containerservice/managedclusters/:resourcename',
+    loadChildren: () => import('./container-service/managed-cluster-diagnostics.module').then(m => m.ManagedClustersDiagnosticsModule)
+  },
   // Generic ARM Resource
   {
     path: 'subscriptions/:subscriptionid/resourcegroups/:resourcegroup/providers/:providerName/:resourceTypeName/:resourcename',

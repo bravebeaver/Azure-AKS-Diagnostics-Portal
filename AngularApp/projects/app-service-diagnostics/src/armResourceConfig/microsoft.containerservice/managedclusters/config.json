@@ -86,16 +86,6 @@
             "createFlowForCategory": true,
             "chatEnabled": false,
             "overviewDetectorId": "aks-category-storage"
-        },
-        {
-            "id": "inClusterDiagnosticaks",
-            "name": "In-Cluster Diagnostics Tools",
-            "description": "Diagnose tools for cluster specific troubleshooting.",
-            "keywords": ["AKS Periscope", "Inspektor Gadget"],
-            "color": "rgb(186, 211, 245)",
-            "createFlowForCategory": true,
-            "chatEnabled": false,
-            "overviewDetectorId": "aks-incluster-diagnosis"
         }
     ],
 
