@@ -25,7 +25,7 @@ const ResourceRoutes = RouterModule.forChild([
   // Azure kubernetes Service
   {
     path: 'subscriptions/:subscriptionid/resourcegroups/:resourcegroup/providers/microsoft.containerservice/managedclusters/:resourcename',
-    loadChildren: () => import('./container-service/managed-cluster-diagnostics.module').then(m => m.ManagedClustersDiagnosticsModule)
+    loadChildren: () => import('./container-services/managed-cluster-diagnostics.module').then(m => m.ManagedClustersDiagnosticsModule)
   },
   // Generic ARM Resource
   {

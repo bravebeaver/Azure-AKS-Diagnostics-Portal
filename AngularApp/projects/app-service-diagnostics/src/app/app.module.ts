@@ -40,7 +40,7 @@ import { SupportTopicService } from './shared-v2/services/support-topic.service'
 import { ResourceResolver } from './home/resolvers/resource.resolver';
 import { ResourcesModule } from './resources/resources.module';
 import { WebSitesModule } from './resources/web-sites/web-sites.module';
-import { ManagedClustersDiagnosticsModule } from  './resources/container-service/managed-cluster-diagnostics.module';
+import { ManagedClustersDiagnosticsModule } from  './resources/container-services/managed-cluster-diagnostics.module';
 import { BackendCtrlService } from './shared/services/backend-ctrl.service';
 import { PortalActionService} from './shared/services/portal-action.service';
 import { FabricModule } from './fabric-ui/fabric.module';
