@@ -17,7 +17,13 @@ const ResourceRoutes = RouterModule.forChild([
     path: '',
     loadChildren: () => import('../../home/home.module').then(m => m.HomeModule),
     resolve: { data: ResourceResolver }
+  },
+  // the redirect service will rewrite the diagnostic tools blade to categories/aksinclusterdiagnostics/tools/Periscope" 
+  {
+    path: 'categories/aksinclusterdiagnostics/tools/:toolId',
+    loadChildren: () => import('../../diagnostic-tools/diagnostic-tools.module').then(m => m.DiagnosticToolsModule)
   }
+  
 ]);
 
 @NgModule({
@@ -26,7 +32,9 @@ const ResourceRoutes = RouterModule.forChild([
     SharedV2Module,
     ResourceRoutes
   ],
-  declarations: [],
+  declarations: [
+    // InClusterDiagnosticToolsComponent
+  ],
   providers: [
     ContentService,
     FeatureService,

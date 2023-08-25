@@ -22,6 +22,7 @@ export class ToolNames {
     public static LinuxNodeHeapDump: string = "Node Heap Dump";
     public static LinuxNodeCpuProfiler: string = "Node CPU Profiler";
     public static LinuxPythonCpuProfiler: string = "Python CPU Profiler";
+    public static Periscope: string = "AKS Periscope";
 }
 
 
@@ -47,4 +48,5 @@ export class ToolIds {
     public static LinuxNodeHeapDump: string = "linuxnodeheapdump";
     public static LinuxNodeCpuProfiler: string = "linuxnodecpuprofiler";
     public static LinuxPythonCpuProfiler: string = "linuxpythoncpuprofiler";
+    public static Periscope: string = 'periscope';
 }

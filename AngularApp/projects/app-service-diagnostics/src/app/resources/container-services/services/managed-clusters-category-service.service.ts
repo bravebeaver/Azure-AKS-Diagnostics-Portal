@@ -4,29 +4,36 @@ import { CategoryService } from '../../../shared-v2/services/category.service';
 import { ResourceService } from '../../../shared-v2/services/resource.service';
 import { ArmResourceConfig } from '../../../shared/models/arm/armResourceConfig';
 import { GenericArmConfigService } from '../../../shared/services/generic-arm-config.service';
+import { PortalActionService } from '../../../shared/services/portal-action.service';
 import { DetectorType } from 'diagnostic-data';
+import { ToolIds } from '../../../shared/models/tools-constants';
 @Injectable()
 export class ManagedClustersCategoryService extends CategoryService{
 
+  // use Custom portal action to open blade in portal
   private _inClusterDiagnosticCategories: Category[] =  [
     {
-      id: "InClusterDiagnosisAKS",
+      // this will open in HubExtension, which takes the InClusterDiagnostics as a resource. 
+      id: "aksinclusterdiagnostics",
       name: "In-Cluster Diagnostic Tools",
+      overviewDetectorId: 'aks-inclusterdiagnostics',
       description: "Diagnostic tools for cluster specific troubleshooting.",
       keywords: ["Periscope", "Inspektor Gadget"],
       categoryQuickLinks: [{
           displayText: "AKS Periscope",
-          id:  "aksincluster-periscope",
-          type: DetectorType.DiagnosticTool
+          id:  ToolIds.Periscope, 
+          type: DetectorType.DiagnosticTool,
       }],
       color: "rgb(186, 211, 245)",
-      createFlowForCategory: true,
+      createFlowForCategory: false,
       chatEnabled: false,
-      overviewDetectorId: 'aks-incluster-diagnostics',
-      overridePath: `resource${this._resourceService.resourceIdForRouting}/inClusterDiagnosticTools`
+      // this is only useful in container-tile, not v4
+      overridePath: `resource${this._resourceService.resourceIdForRouting}/inClusterDiagnostics`
   }];
 
-  constructor(private _resourceService: ResourceService, private _armConfigService: GenericArmConfigService) { 
+  constructor (private _resourceService: ResourceService, 
+              private _armConfigService: GenericArmConfigService, 
+              private _portalService: PortalActionService) { 
     super();
     
     let currConfig: ArmResourceConfig = _armConfigService.getArmResourceConfig(_resourceService.resource.id);

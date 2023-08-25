@@ -15,8 +15,7 @@ import { Globals } from '../../globals';
 export class PortalActionService {
     public apiVersion = '2016-08-01';
     public LoadTestingId: string = 'loadtestingcustomblade';
-    public AKSPeriscopeId: string ="aksincluster-periscope"
-
+    
     public currentSite: ResponseMessageEnvelope<Site>;
     private resourceId: string;
     constructor(private _windowService: WindowService, private _portalService: PortalService, private _armService: ArmService,
@@ -326,25 +325,9 @@ export class PortalActionService {
         this._portalService.openBlade(bladeInfo, 'troubleshoot');
     }
 
-    public openAKSPeriscopeBlade() {
-        let bladeInfo = {
-            extension: 'HubsExtension',
-            detailBlade: 'BrowseResource',
-            detailBladeInputs: {
-                resourceType: "Microsoft.LoadTestService/LoadTests"
-            }
-        };
-
-        this._portalService.openBlade(bladeInfo, 'troubleshoot');
-    }
-
     public openCustomPortalActionBlade(id: string) {
         if (id === this.LoadTestingId) {
             this.openLoadTestingBlade();
-        }
-
-        if (id == this.AKSPeriscopeId) {
-            this.openAKSPeriscopeBlade();
         }
     }
 

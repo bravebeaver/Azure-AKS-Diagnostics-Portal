@@ -162,6 +162,16 @@ export const DiagnosticToolsRoutes: Route[] = [
             cacheComponent: true
         }
     },
+    
+    // AKS In-Cluster Diagnostics - Periscope
+    {
+        path: "periscope",
+        component: LinuxPythonCpuProfilerComponent,
+        data: {
+            navigationTitle: ToolNames.Periscope,
+            cacheComponent: true
+        }
+    },
     // Database Test Tool
     {
         path: 'databasetester',
