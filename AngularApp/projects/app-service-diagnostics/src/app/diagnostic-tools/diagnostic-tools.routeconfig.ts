@@ -22,7 +22,7 @@ import { NetworkCheckComponent } from '../shared/components/tools/network-checks
 import { LinuxNodeHeapDumpComponent } from '../shared/components/tools/linux-node-heap-dump/linux-node-heap-dump.component';
 import { LinuxNodeCpuProfilerComponent } from '../shared/components/tools/linux-node-cpu-profiler/linux-node-cpu-profiler.component';
 import { LinuxPythonCpuProfilerComponent } from '../shared/components/tools/linux-python-cpu-profiler/linux-python-cpu-profiler.component';
-
+import { AksPeriscopeComponent } from '../shared/components/tools/aks-periscope/aks-periscope.component';
 @Injectable()
 export class MetricsPerInstanceAppsResolver implements Resolve<Observable<boolean>> {
     private resourceId: string;
@@ -162,16 +162,6 @@ export const DiagnosticToolsRoutes: Route[] = [
             cacheComponent: true
         }
     },
-    
-    // AKS In-Cluster Diagnostics - Periscope
-    {
-        path: "periscope",
-        component: LinuxPythonCpuProfilerComponent,
-        data: {
-            navigationTitle: ToolNames.Periscope,
-            cacheComponent: true
-        }
-    },
     // Database Test Tool
     {
         path: 'databasetester',
@@ -271,6 +261,15 @@ export const DiagnosticToolsRoutes: Route[] = [
         resolve: {
             reroute: SecurityScanningResolver
         },
+    },
+    // Managed Clusters In-Cluster Diagnostics - AKS Periscope
+    {
+        path: "aksperiscope",
+        component: AksPeriscopeComponent,
+        data: {
+            navigationTitle: ToolNames.AKSPeriscope,
+            cacheComponent: true
+        }
     },
 ];
 

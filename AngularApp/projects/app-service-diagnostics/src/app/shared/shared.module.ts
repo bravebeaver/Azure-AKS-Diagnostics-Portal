@@ -127,6 +127,7 @@ import { FabLinkModule } from '@angular-react/fabric/lib/components/link';
 import { FabPivotModule } from '@angular-react/fabric/lib/components/pivot';
 import { DownloadReportComponent } from './components/download-report/download-report.component';
 import { OptInsightsService } from './services/optinsights/optinsights.service';
+import { AksPeriscopeComponent } from './components/tools/aks-periscope/aks-periscope.component';
 
 @NgModule({
     declarations: [
@@ -198,7 +199,8 @@ import { OptInsightsService } from './services/optinsights/optinsights.service';
         LinuxPythonCpuProfilerComponent,
         LinuxNodeHeapDumpComponent,
         LinuxNodeCpuProfilerComponent,
-        DownloadReportComponent
+        DownloadReportComponent,
+        AksPeriscopeComponent,
     ],
     imports: [
         HttpClientModule,

@@ -1,0 +1,49 @@
+<div class="category-container" style="width:60%">
+  <h2>AKS Periscope</h2>
+  <p class="category-description">
+    AKS Periscope allows AKS customers to collect and export the logs into an Azure Blob storage account
+    to help analyze and identify potential problems or easily share the information to support to help 
+    with the troubleshooting process. 
+    <a target="_blank" rel="noopener" href="https://github.com/Azure/aks-periscope">Learn more</a>
+  </p>
+
+  <div style="margin-top: 40px;">
+    <collapsible-list-fabric [collapsed]="collapsed" [title]="'Configure'">
+      <collapsible-list-item body>
+        <div class="container">
+          <div>
+            <div class="row mt-4">
+              <div class="col-md-3 field-label">
+                Storage account <span class="required">*</span>
+                <fab-tooltip-host
+                  content="The selected storage account will store the memory dumps captured via Crash Monitoring. It is strongly advised that you use one storage account per app. Selecting a storage account already in use for another app may cause Crash Monitoring to fail"
+                  [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                  <img src="assets/img/info.svg" />
+                </fab-tooltip-host>
+
+              </div>
+              <div class="col-md-2">
+                <span> {{ chosenStorageAccount }}
+                </span>
+                <div class="mt-1 mb-4" (click)="toggleStorageAccountPanel()"
+                  (keyup.enter)="toggleStorageAccountPanel()">
+                  <a tabindex="0" role="button" name="Change storage account" aria-label="Change storage account">
+                    {{ chosenStorageAccount != null && chosenStorageAccount.length > 0  ? 'Change' : 'Select' }}</a>
+                </div>
+              </div>
+            </div>
+            
+          </div>
+
+          <div class="mt-3 ml-3">
+            <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="aksPeriscopeEnabled"
+              (onClick)="startPeriscope()">
+              Run AKS periscope
+            </fab-primary-button>
+          </div>
+        </div>
+      </collapsible-list-item>
+    </collapsible-list-fabric>
+
+  </div>
+</div>

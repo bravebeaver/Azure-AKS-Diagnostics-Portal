@@ -64,6 +64,7 @@ import { DownloadReportComponent } from '../shared/components/download-report/do
 import { GenericClientScriptService } from 'projects/diagnostic-data/src/lib/services/generic-client-script.service';
 import { ClientScriptService } from '../shared-v2/services/client-script.service';
 import { OpenAIArmService } from '../../../../diagnostic-data/src/public_api';
+import { AksPeriscopeComponent } from '../shared/components/tools/aks-periscope/aks-periscope.component';
 
 export const HomeRoutes = RouterModule.forChild([
     {
@@ -449,6 +450,15 @@ export const HomeRoutes = RouterModule.forChild([
                         resolve: {
                             reroute: SecurityScanningResolver
                         },
+                    },
+                    // AKS in-cluster diagnostic tools
+                    {
+                        path: 'tools/aksperiscope',
+                        component: AksPeriscopeComponent,
+                        data: {
+                            navigationTitle: ToolNames.AKSPeriscope,
+                            cacheComponent: true
+                        }
                     },
                     // App settings page
                     {

@@ -21,7 +21,7 @@ export class ManagedClustersCategoryService extends CategoryService{
       keywords: ["Periscope", "Inspektor Gadget"],
       categoryQuickLinks: [{
           displayText: "AKS Periscope",
-          id:  ToolIds.Periscope, 
+          id:  ToolIds.AKSPeriscope, 
           type: DetectorType.DiagnosticTool,
       }],
       color: "rgb(186, 211, 245)",
