@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { SharedModule } from '../../shared/shared.module';
 import { SharedV2Module } from '../../shared-v2/shared-v2.module';
 import { ResourceService } from '../../shared-v2/services/resource.service';
 import { ResourceResolver } from '../../home/resolvers/resource.resolver';
@@ -11,6 +12,8 @@ import { FeatureService } from '../../shared-v2/services/feature.service';
 import { LoggingV2Service } from '../../shared-v2/services/logging-v2.service';
 import { SupportTopicService } from '../../shared-v2/services/support-topic.service';
 import { CXPChatCallerService } from '../../shared-v2/services/cxp-chat-caller.service';
+import { InClusterDiagnosticToolsComponent } from './components/managed-clusters/in-cluster-diagnostic-tools.component';
+import { DiagnosticDataModule} from 'diagnostic-data';
 
 const ResourceRoutes = RouterModule.forChild([
   {
@@ -18,22 +21,31 @@ const ResourceRoutes = RouterModule.forChild([
     loadChildren: () => import('../../home/home.module').then(m => m.HomeModule),
     resolve: { data: ResourceResolver }
   },
+  {
+    path: 'aksinclusterdiagnostics',
+    component: InClusterDiagnosticToolsComponent,
+    data: {
+      navigationTitle: 'In-Cluster Diagnostic Tools',
+      cacheComponent: true
+    }
+  },
   // the redirect service will rewrite the diagnostic tools blade to categories/aksinclusterdiagnostics/tools/Periscope" 
   {
     path: 'categories/aksinclusterdiagnostics/tools/:toolId',
     loadChildren: () => import('../../diagnostic-tools/diagnostic-tools.module').then(m => m.DiagnosticToolsModule)
   }
-  
 ]);
 
 @NgModule({
   imports: [
     CommonModule,
+    SharedModule,
     SharedV2Module,
-    ResourceRoutes
+    ResourceRoutes,
+    DiagnosticDataModule
   ],
   declarations: [
-    // InClusterDiagnosticToolsComponent
+    InClusterDiagnosticToolsComponent
   ],
   providers: [
     ContentService,

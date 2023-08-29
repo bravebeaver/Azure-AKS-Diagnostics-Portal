@@ -1,0 +1,11 @@
+<div class="tool-container">
+  
+    <collapsible-list *ngFor="let toolCategory of toolCategories " [title]="toolCategory.title"
+      [collapsed]="false">
+      <collapsible-list-item>
+        <tile-list [tiles]="toolCategory.tools "></tile-list>
+      </collapsible-list-item>
+    </collapsible-list>
+  
+
+  </div>
