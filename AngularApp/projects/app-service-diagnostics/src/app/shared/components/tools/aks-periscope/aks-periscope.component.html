@@ -1,4 +1,4 @@
-<div class="category-container" style="width:60%">
+<div class="category-container">
   <h2>AKS Periscope</h2>
   <p class="category-description">
     AKS Periscope allows AKS customers to collect and export the logs into an Azure Blob storage account
@@ -7,43 +7,67 @@
     <a target="_blank" rel="noopener" href="https://github.com/Azure/aks-periscope">Learn more</a>
   </p>
 
-  <div style="margin-top: 40px;">
-    <collapsible-list-fabric [collapsed]="collapsed" [title]="'Configure'">
+  <div *ngIf="status < toolStatus.Loaded">
+    <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
+    Loading...
+  </div>
+
+  <div *ngIf="status >= toolStatus.Loaded" style="margin-top: 40px;">
+    <collapsible-list-fabric [title]="'Configure'">
+      <!--TODO list existing periscope runs -->
+      <!--configure periscope run-->
       <collapsible-list-item body>
         <div class="container">
           <div>
             <div class="row mt-4">
-              <div class="col-md-3 field-label">
-                Storage account <span class="required">*</span>
+              <div class="row">
+                <div class="col-md-3 field-label"> Diagnotisc RunId <span class="required">*</span>
+                  <fab-tooltip-host content="The identifier for a particular 'run' of Periscope. This will become the topmost container within the container name"
+                    [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                    <img src="assets/img/info.svg" title="info" />
+                  </fab-tooltip-host>
+                </div>
+                <div class="col-md-2">
+                  <input type="text" aria-required="false" id="diagnosticRunId" placeholder="e.g. 2023-12-12T15-20-20Z" [(ngModel)]="diagnosticRunId">
+                </div>  
+              </div>
+              <div class="col-md-3 field-label"> Storage account <span class="required">*</span>
                 <fab-tooltip-host
-                  content="The selected storage account will store the memory dumps captured via Crash Monitoring. It is strongly advised that you use one storage account per app. Selecting a storage account already in use for another app may cause Crash Monitoring to fail"
+                  content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
+                  or an account with a shared access signature token"
                   [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                  <img src="assets/img/info.svg" />
+                  <img src="assets/img/info.svg" title="storage-account"/>
                 </fab-tooltip-host>
-
               </div>
               <div class="col-md-2">
-                <span> {{ chosenStorageAccount }}
-                </span>
-                <div class="mt-1 mb-4" (click)="toggleStorageAccountPanel()"
-                  (keyup.enter)="toggleStorageAccountPanel()">
+                <span> {{ storageAccountName }} </span>
+                <div class="mt-1 mb-4" (click)="toggleStorageAccountPanel()" (keyup.enter)="toggleStorageAccountPanel()">
                   <a tabindex="0" role="button" name="Change storage account" aria-label="Change storage account">
-                    {{ chosenStorageAccount != null && chosenStorageAccount.length > 0  ? 'Change' : 'Select' }}</a>
+                    {{ storageAccountName != null && storageAccountName.length > 0  ? 'Change' : 'Select' }}</a>
                 </div>
               </div>
             </div>
-            
+          </div>
+
+          <div class="row" *ngIf="error || errorMessage ||validationError">
+            <div class="col-md-6 error-details">
+              <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
+              <span *ngIf="errorMessage">{{ errorMessage}}</span> &nbsp;<span *ngIf="error">{{ error}}</span>
+              <span *ngIf="validationError">{{ validationError}}</span>
+            </div>
           </div>
 
           <div class="mt-3 ml-3">
-            <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="aksPeriscopeEnabled"
-              (onClick)="startPeriscope()">
+            <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="validConfiguration" (onClick)="startPeriscope()">
               Run AKS periscope
             </fab-primary-button>
+            <div style="float:left;padding-top: 6px;" *ngIf="status === toolStatus.RunningPeriscope">
+              <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
+              {{ periscopeRunningStatus }}
+            </div>
           </div>
         </div>
       </collapsible-list-item>
     </collapsible-list-fabric>
-
   </div>
 </div>
