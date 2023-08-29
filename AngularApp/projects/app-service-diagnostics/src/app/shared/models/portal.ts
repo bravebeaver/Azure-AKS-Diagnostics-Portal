@@ -30,7 +30,8 @@ export interface StartupInfo {
 export enum ResourceType {
     Site = 0,
     HostingEnvironment = 1,
-    Other = 2
+    Other = 2,
+    ManagedCluster = 3,
 }
 
 export enum AppType {
