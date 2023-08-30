@@ -17,3 +17,9 @@ export class RunCommandResult {
         reason: string;
     }
 }
+
+export class RunCommandRequest {
+    command: string;
+    clusterToken: string;
+    context: string;
+}

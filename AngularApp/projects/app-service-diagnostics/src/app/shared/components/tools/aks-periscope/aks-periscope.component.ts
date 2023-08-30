@@ -10,6 +10,7 @@ import { DaasService } from '../../../services/daas.service';
 import { ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster';
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
+import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 
 @Component({
   selector: 'aks-periscope',
@@ -29,8 +30,9 @@ export class AksPeriscopeComponent implements OnInit {
   // UI Stuff
   status: toolStatus = toolStatus.Loading;
   toolStatus = toolStatus;
-  validConfiguration: boolean = false;
   periscopeRunningStatus: string = "";
+
+  validConfiguration: boolean = false;
   validationError: string = "";
   errorMessage: string;
   error: any;
@@ -88,14 +90,17 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   startPeriscope() {
-    if (this.validateConfiguration()) {
-      this.status = toolStatus.RunningPeriscope;
+    // if (this.validateConfiguration()) {
+    //   this.status = toolStatus.RunningDiagnosticTools;
 
-    } else {
-      //error is populated by validateConfiguration
-      this.status = toolStatus.Error;
-    }
-    this._adminManagedCluster.runPeriscope(this.periscopeConfig);
+    // } else {
+    //   //error is populated by validateConfiguration
+    //   this.status = toolStatus.Error;
+    // }
+    this._adminManagedCluster.runPeriscope(this.periscopeConfig).subscribe((result: RunCommandResult) => {
+      this.periscopeRunningStatus = JSON.stringify(result);
+      this.status = toolStatus.Loaded;
+    });
   }
 
   validateConfiguration(): boolean {
@@ -134,7 +139,7 @@ export enum toolStatus {
   Loading,
   CheckingBlobSasUri,
   Loaded,
-  RunningPeriscope,
+  RunningDiagnosticTools,
   Error
 }
 

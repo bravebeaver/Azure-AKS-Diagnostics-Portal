@@ -15,6 +15,11 @@
   <div *ngIf="status >= toolStatus.Loaded" style="margin-top: 40px;">
     <collapsible-list-fabric [title]="'Configure'">
       <!--TODO list existing periscope runs -->
+      <div header class="container">
+        <div header class="summaryText">
+          {{ periscopeRunningStatus }}
+        </div>
+      </div>
       <!--configure periscope run-->
       <collapsible-list-item body>
         <div class="container">
@@ -61,10 +66,6 @@
             <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="validConfiguration" (onClick)="startPeriscope()">
               Run AKS periscope
             </fab-primary-button>
-            <div style="float:left;padding-top: 6px;" *ngIf="status === toolStatus.RunningPeriscope">
-              <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
-              {{ periscopeRunningStatus }}
-            </div>
           </div>
         </div>
       </collapsible-list-item>

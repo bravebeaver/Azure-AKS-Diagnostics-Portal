@@ -13,6 +13,7 @@ import { ManagedClusterMetaInfo, ManagedCluster } from '../../shared/models/mana
 @Injectable()
 export class ManagedClustersService {
   
+  // TODO double check whether we need this, as the cluster info should not change
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
   public currentCluster: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
   

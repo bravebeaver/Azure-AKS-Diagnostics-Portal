@@ -8,7 +8,7 @@
 	"searchSuffix": "",
 	"azureServiceName": "",
 	"armApiConfig": {
-		"armApiVersion": "",
+		"armApiVersion": "2023-07-01",
 		"isArmApiResponseBase64Encoded": false
 	},
 	"isSearchEnabled": true,
