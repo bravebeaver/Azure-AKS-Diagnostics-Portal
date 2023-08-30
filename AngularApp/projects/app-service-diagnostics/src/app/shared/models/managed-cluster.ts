@@ -6,6 +6,7 @@ export class ManagedClusterMetaInfo  {
     resourceGroupName: string;
     managedResourceGroupName: string;
     name: string;
+    apiVersion: string;
 }
 
 export class ManagedCluster extends ManagedClusterMetaInfo {

@@ -128,6 +128,8 @@ import { FabPivotModule } from '@angular-react/fabric/lib/components/pivot';
 import { DownloadReportComponent } from './components/download-report/download-report.component';
 import { OptInsightsService } from './services/optinsights/optinsights.service';
 import { AksPeriscopeComponent } from './components/tools/aks-periscope/aks-periscope.component';
+import { AdminManagedClustersService } from '../shared-v2/services/admin-managed-clusters.service';
+import { ManagedClustersService } from '../shared-v2/services/managed-clusters.service';
 
 @NgModule({
     declarations: [
@@ -325,7 +327,9 @@ export class SharedModule {
                 GroupByPipe,
                 LocalBackendService,
                 ABTestingService,
-                OptInsightsService
+                OptInsightsService, 
+                AdminManagedClustersService, 
+                ManagedClustersService,
             ]
         };
     }

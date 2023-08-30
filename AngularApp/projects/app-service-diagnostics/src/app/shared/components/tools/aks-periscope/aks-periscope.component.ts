@@ -1,8 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-import * as moment from 'moment';
 
 import { TelemetryService } from 'diagnostic-data';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
@@ -10,8 +7,9 @@ import { Globals } from '../../../../globals';
 import { SharedStorageAccountService } from '../../../../shared-v2/services/shared-storage-account.service';
 import { DaasService } from '../../../services/daas.service';
 
-import { ManagedClustersService } from '../../../../resources/container-services/services/managed-clusters.service';
-import {  InClusterDiagnosticSettings, ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster';
+import { ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster';
+import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
+import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 
 @Component({
   selector: 'aks-periscope',
@@ -42,7 +40,8 @@ export class AksPeriscopeComponent implements OnInit {
     private telemetryService: TelemetryService, 
     private _daasService: DaasService,
     private _sharedStorageAccountService: SharedStorageAccountService, 
-    private _managedClusterService: ManagedClustersService) {
+    private _managedClusterService: ManagedClustersService, 
+    private _adminManagedCluster: AdminManagedClustersService) {
       // use storage account shared service to get storage account
       this._sharedStorageAccountService.changeEmitted$.subscribe(newStorageAccount => {
         this.storageAccountName = newStorageAccount.name;
@@ -59,13 +58,7 @@ export class AksPeriscopeComponent implements OnInit {
       this.clusterToDiagnose = managedCluster;   
       this.status = toolStatus.CheckingBlobSasUri;
       
-      this.getClusterDiagnosticStorageAccount().subscribe(storageAccountName => {
-        if (storageAccountName) {
-          this.storageAccountName = storageAccountName;
-        }
-      });
-
-      this._managedClusterService.getPeriscopeConfig().pipe(map(periscopeConfig => {
+      this._adminManagedCluster.getPeriscopeConfig().subscribe(periscopeConfig => {
         if (periscopeConfig) {
           this.periscopeConfig = periscopeConfig; 
           if (periscopeConfig.storageAccountSasToken) {
@@ -74,13 +67,15 @@ export class AksPeriscopeComponent implements OnInit {
             this.storageAccountName = this._daasService.getStorageAccountNameFromConnectionString(periscopeConfig.storageAccountConnectionString);
           }          
           this.populateSettings();
+        } else if (managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.storageAccountName) {
+          this.storageAccountName = managedCluster.diagnosticSettings.storageAccountName
         }
       },
       error => {
-        this.errorMessage = "Failed while checking configured storage account";
+        this.errorMessage = "Failed while fetching cluster details";
         this.status = toolStatus.Error;
         this.error = error;
-      }));
+      });
 
       this.status = toolStatus.Loaded;
 
@@ -88,30 +83,19 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   populateSettings() {
-    this.diagnosticRunId  = moment(Date.now()).format('YYYY-MM-DDTHH:mmZ'); 
     this.storageAccountContainerName = this.periscopeConfig.storageAccountContainerName;
     this.storageAccountConnectionString = this.periscopeConfig.storageAccountConnectionString;
-  }
-
-  getClusterDiagnosticStorageAccount(): Observable<string> {
-    return this._managedClusterService.currentCluster.pipe(map(cluster => {
-      if (cluster) {
-        if (cluster.diagnosticSettings && cluster.diagnosticSettings.storageAccountName) {
-          return cluster.diagnosticSettings.storageAccountName;
-        } 
-      }
-    }));
   }
 
   startPeriscope() {
     if (this.validateConfiguration()) {
       this.status = toolStatus.RunningPeriscope;
-      this.runPeriscope();
 
     } else {
       //error is populated by validateConfiguration
       this.status = toolStatus.Error;
     }
+    this._adminManagedCluster.runPeriscope(this.periscopeConfig);
   }
 
   validateConfiguration(): boolean {
@@ -124,16 +108,6 @@ export class AksPeriscopeComponent implements OnInit {
     }
 
     return true;
-  }
-
-  toggleStorageAccountPanel() {
-    this.globals.openCreateStorageAccountPanel = !this.globals.openCreateStorageAccountPanel;
-    this.telemetryService.logEvent("OpenCreateStorageAccountPanel");
-    this.telemetryService.logPageView("CreateStorageAccountPanelView");
-  }
-
-  runPeriscope() {
-    this.periscopeRunningStatus = "Starting periscope with settings " + this.diagnosticRunId + " " + this.storageAccountSasString;
   }
 
   // For tooltip display

@@ -1,20 +1,17 @@
 import { Injectable } from '@angular/core';
-import { Observable, BehaviorSubject, of } from 'rxjs';
-import { ManagedClusterMetaInfo, ManagedCluster,  InClusterDiagnosticSettings, PeriscopeConfig } from '../../../shared/models/managed-cluster';
-import { map, mergeMap } from 'rxjs/operators';
-import { DaasStorageConfiguration } from '../../../shared/models/daas';
+import { Observable, BehaviorSubject } from 'rxjs';
+import { map } from 'rxjs/operators';
 
-import { AuthService } from '../../../startup/services/auth.service';
-import { StartupInfo, ResourceType } from '../../../shared/models/portal';
-import { ArmService } from '../../../shared/services/arm.service';
-import { ResponseMessageEnvelope } from '../../../shared/models/responsemessageenvelope';
-import { StorageAccount } from '../../../shared/models/storage';
+import { AuthService } from '../../startup/services/auth.service';
 
-@Injectable({
-  providedIn: 'root'
-})
+import { StartupInfo, ResourceType } from '../../shared/models/portal';
+import { ArmService } from '../../shared/services/arm.service';
+import { ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
+
+import { ManagedClusterMetaInfo, ManagedCluster } from '../../shared/models/managed-cluster';
+
+@Injectable()
 export class ManagedClustersService {
-  
   
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
   public currentCluster: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
@@ -31,7 +28,6 @@ export class ManagedClustersService {
           let currentClusterValue: ManagedCluster = managedCluster.properties;
           currentClusterValue.resourceUri = managedCluster.id;
           // currentClusterValue.identity = managedCluster.identity;
-          currentClusterValue.name = managedCluster.name; 
           currentClusterValue.location = managedCluster.location;
           //TODO  check whether cluster has configured diagnostic settings, now just return empty
           currentClusterValue.diagnosticSettings = null;
@@ -59,10 +55,6 @@ export class ManagedClustersService {
     });
   }
 
-  getPeriscopeConfig(): Observable<PeriscopeConfig> {
-    // TODO check whether the cluster has periscope daemonset deployed already
-    return of(null)
-  }
   
 }
   

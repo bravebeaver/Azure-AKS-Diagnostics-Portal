@@ -1,17 +1,18 @@
 import { Injectable } from '@angular/core';
+
+import { ArmResourceConfig } from '../../../shared/models/arm/armResourceConfig';
+import { GenericArmConfigService } from '../../../shared/services/generic-arm-config.service';
+import { ToolIds } from '../../../shared/models/tools-constants';
+
 import { Category } from '../../../shared-v2/models/category';
 import { CategoryService } from '../../../shared-v2/services/category.service';
 import { ResourceService } from '../../../shared-v2/services/resource.service';
-import { ArmResourceConfig } from '../../../shared/models/arm/armResourceConfig';
-import { GenericArmConfigService } from '../../../shared/services/generic-arm-config.service';
-import { PortalActionService } from '../../../shared/services/portal-action.service';
+
 import { DetectorType } from 'diagnostic-data';
-import { ToolIds } from '../../../shared/models/tools-constants';
 @Injectable()
 export class ManagedClustersCategoryService extends CategoryService{
   constructor (private _resourceService: ResourceService, 
-              private _armConfigService: GenericArmConfigService, 
-              private _portalService: PortalActionService) { 
+              private _armConfigService: GenericArmConfigService) { 
     super();
 
     // add original categories from config.json
