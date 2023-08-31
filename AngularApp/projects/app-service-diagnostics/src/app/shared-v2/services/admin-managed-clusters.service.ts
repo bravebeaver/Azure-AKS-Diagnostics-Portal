@@ -8,7 +8,7 @@ import { ArmService } from '../../shared/services/arm.service';
 import { CredentialResult, CredentialResults, K8sContext, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { ManagedCluster, PeriscopeConfig} from '../../shared/models/managed-cluster';
 import { ManagedClustersService } from './managed-clusters.service';
-import { HttpClient, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
 
 import * as yaml from 'yaml';
 
@@ -48,7 +48,7 @@ export class AdminManagedClustersService {
   }
 
   runKubectlPeriscope(periscopeConfig: PeriscopeConfig): Observable<string> {
-    // GET https://${apiServerEndpoint}/api/v1/pods --cacert ca.crt --cert client.crt --key client.key
+    // GET https://${apiServerEndpoint}/api/v1/nodes --cacert ca.crt --cert client.crt --key client.key
     const currentCredential =  this.clusterCredentials$.getValue();
     if (currentCredential) {
       const kubeConfig = currentCredential.kubeconfig;
@@ -60,15 +60,17 @@ export class AdminManagedClustersService {
       };
       
       const options = {
-        headers: this._armService.getHeaders(),
+        headers: new HttpHeaders({ 
+          'Access-Control-Allow-Origin':'*',
+        }),
         https: {
           cert: kubeContext.cert,
           ca: kubeContext.cacert,
           key: kubeContext.key
         },
-      };
+    };
 
-      return this._http.get(kubeContext.endpoint, options).pipe(
+      return this._http.get(`${kubeContext.endpoint}/api/v1/nodes`, options).pipe(
         map((response: string) => {
           return response;
         }),
@@ -89,7 +91,7 @@ export class AdminManagedClustersService {
         map((clusterToken: CredentialResult) => {
           return {
             command: command,
-            clusterToken: clusterToken.value,
+            clusterToken: clusterToken.kubeconfig.users[0].user.token,
             context: context
           };
         })

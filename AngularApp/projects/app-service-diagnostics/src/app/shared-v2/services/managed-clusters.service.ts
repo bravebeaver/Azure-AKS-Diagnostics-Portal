@@ -52,7 +52,7 @@ export class ManagedClustersService {
 
   isPrivateCluster(): boolean {
     // TODO runCommand is better suited for private cluster, but it is not ready yet
-    return false;
+    return true;
   }
 
   private _populateManagedClusterMetaInfo(resourceId: string): void {
