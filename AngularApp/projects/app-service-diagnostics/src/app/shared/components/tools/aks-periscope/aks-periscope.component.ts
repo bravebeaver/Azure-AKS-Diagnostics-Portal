@@ -11,6 +11,7 @@ import { ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
+import { map, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'aks-periscope',
@@ -28,8 +29,8 @@ export class AksPeriscopeComponent implements OnInit {
   diagnosticRunId: string  = "";
 
   // UI Stuff
-  status: toolStatus = toolStatus.Loading;
-  toolStatus = toolStatus;
+  status: ToolStatus = ToolStatus.Loading;
+  toolStatus = ToolStatus;
   periscopeRunningStatus: string = "";
 
   validConfiguration: boolean = false;
@@ -58,7 +59,7 @@ export class AksPeriscopeComponent implements OnInit {
     //update periscope config if storage account is re-configured;
     this._managedClusterService.getManagedCluster().subscribe(managedCluster => {
       this.clusterToDiagnose = managedCluster;   
-      this.status = toolStatus.CheckingBlobSasUri;
+      this.status = ToolStatus.CheckingBlobSasUri;
       
       this._adminManagedCluster.getPeriscopeConfig().subscribe(periscopeConfig => {
         if (periscopeConfig) {
@@ -75,11 +76,11 @@ export class AksPeriscopeComponent implements OnInit {
       },
       error => {
         this.errorMessage = "Failed while fetching cluster details";
-        this.status = toolStatus.Error;
+        this.status = ToolStatus.Error;
         this.error = error;
       });
 
-      this.status = toolStatus.Loaded;
+      this.status = ToolStatus.Loaded;
 
     });
   }
@@ -97,12 +98,25 @@ export class AksPeriscopeComponent implements OnInit {
     //   //error is populated by validateConfiguration
     //   this.status = toolStatus.Error;
     // }
-    this._adminManagedCluster.runPeriscope(this.periscopeConfig).subscribe((result: RunCommandResult) => {
-      this.periscopeRunningStatus = JSON.stringify(result);
-      this.status = toolStatus.Loaded;
-    });
-  }
+    this._adminManagedCluster.runPeriscope(this.periscopeConfig).pipe(
+      map((submitCommandResult: RunCommandResult) => {
+        this.periscopeRunningStatus = `Command submitted with ID - ${JSON.stringify(submitCommandResult)}, checking results...`;
+        this.status = ToolStatus.RunningDiagnosticTools;
+        return submitCommandResult; // dont change anything
+      }),
+      switchMap( (submitCommandResult: RunCommandResult) => {
+        return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
+      })
+    ).subscribe((runCommandResult: RunCommandResult) => {
+        this.periscopeRunningStatus = `command result ...${JSON.stringify(runCommandResult)}`;
+        this.status = ToolStatus.Loaded;
+      });
+  } 
+    
+  toggleStorageAccountPanel() {
 
+  }
+  
   validateConfiguration(): boolean {
     if (this.storageAccountSasString == null || this.storageAccountSasString == "") {
       return false;
@@ -135,7 +149,7 @@ export class AksPeriscopeComponent implements OnInit {
   }
 }
 
-export enum toolStatus {
+export enum ToolStatus {
   Loading,
   CheckingBlobSasUri,
   Loaded,

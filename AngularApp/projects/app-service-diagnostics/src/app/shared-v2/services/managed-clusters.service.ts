@@ -9,7 +9,9 @@ import { ArmService } from '../../shared/services/arm.service';
 import { ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
 
 import { ManagedClusterMetaInfo, ManagedCluster } from '../../shared/models/managed-cluster';
+import { ResourceService } from './resource.service';
 
+//TODO the generic resource service might be just enough
 @Injectable()
 export class ManagedClustersService {
   
@@ -19,7 +21,8 @@ export class ManagedClustersService {
   
   constructor(
     protected _authService: AuthService, 
-    protected _armClient: ArmService
+    protected _armClient: ArmService, 
+    protected _resourceService: ResourceService
   ) { 
     this._authService.getStartupInfo().subscribe((startUpInfo: StartupInfo) => {
       this._populateManagedClusterMetaInfo(startUpInfo.resourceId);
