@@ -14,6 +14,7 @@ import { ResourceService } from './resource.service';
 //TODO the generic resource service might be just enough
 @Injectable()
 export class ManagedClustersService {
+
   
   // TODO double check whether we need this, as the cluster info should not change
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
@@ -47,6 +48,11 @@ export class ManagedClustersService {
         return cluster;
       }
     }));
+  }
+
+  isPrivateCluster(): boolean {
+    // TODO runCommand is better suited for private cluster, but it is not ready yet
+    return false;
   }
 
   private _populateManagedClusterMetaInfo(resourceId: string): void {

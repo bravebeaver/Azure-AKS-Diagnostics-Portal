@@ -1,14 +1,16 @@
 import { Injectable } from '@angular/core';
 
-import {BehaviorSubject, EMPTY, Observable, timer } from 'rxjs';
-import { map, mergeMap, filter, switchMap, retryWhen, repeatWhen, takeWhile, takeLast } from 'rxjs/operators';
+import {BehaviorSubject, EMPTY, Observable, from, of, timer } from 'rxjs';
+import { map, switchMap,takeWhile, takeLast } from 'rxjs/operators';
 
 import { ArmService } from '../../shared/services/arm.service';
 
-import { CredentialResult, CredentialResults, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
+import { CredentialResult, CredentialResults, K8sContext, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { ManagedCluster, PeriscopeConfig} from '../../shared/models/managed-cluster';
 import { ManagedClustersService } from './managed-clusters.service';
-import { HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpResponse } from '@angular/common/http';
+
+import * as yaml from 'yaml';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
 const RUN_COMMAND_INTERVAL_MS: number = 5000;
@@ -22,7 +24,8 @@ export class AdminManagedClustersService {
   public currentCluster: ManagedCluster;
   
   constructor(private _managedClusterService: ManagedClustersService, 
-    private _armService: ArmService) {
+    private _armService: ArmService, 
+    private _http: HttpClient) {
       this._managedClusterService.getManagedCluster().subscribe(cluster => {
         this.currentCluster = cluster;
         this.getClientAdminCredentials();
@@ -34,9 +37,49 @@ export class AdminManagedClustersService {
     this._armService.postResourceWithoutEnvelope<CredentialResults, any>(`${this.currentCluster.resourceUri}/${ManagedClusterCommandApi.LIST_CLUSTER_ADMIN_CREDENTIAL}`, false)
       .subscribe((response: CredentialResults) => {
         if (response.kubeconfigs && response.kubeconfigs.length > 0) {
-          this.clusterCredentials$.next(response.kubeconfigs[0]);
+          if (response.kubeconfigs.length > 1) {
+            console.log(`received cluster credentials ${response.kubeconfigs.length}, use the first one only.`);
+          }
+          let userCredential: CredentialResult = {...response.kubeconfigs[0]};
+          userCredential.kubeconfig = yaml.parse(atob(userCredential.value)) as KubeConfigCredentials;
+          this.clusterCredentials$.next(userCredential);
         }
     });
+  }
+
+  runKubectlPeriscope(periscopeConfig: PeriscopeConfig): Observable<string> {
+    // GET https://${apiServerEndpoint}/api/v1/pods --cacert ca.crt --cert client.crt --key client.key
+    const currentCredential =  this.clusterCredentials$.getValue();
+    if (currentCredential) {
+      const kubeConfig = currentCredential.kubeconfig;
+      const kubeContext =  {
+          endpoint: kubeConfig.clusters[0].cluster.server,
+          cacert: atob(kubeConfig.clusters[0].cluster['certificate-authority-data']),
+          cert: atob(kubeConfig.users[0].user['client-certificate-data']),
+          key: atob(kubeConfig.users[0].user['client-key-data']),
+      };
+      
+      const options = {
+        headers: this._armService.getHeaders(),
+        https: {
+          cert: kubeContext.cert,
+          ca: kubeContext.cacert,
+          key: kubeContext.key
+        },
+      };
+
+      return this._http.get(kubeContext.endpoint, options).pipe(
+        map((response: string) => {
+          return response;
+        }),
+        (error) => {
+          console.log(error);
+          return error;
+        }
+      ) as Observable<string>;
+    } else {
+      return of(`could not find kubeconfig.`);
+    }
   }
 
   // TOOD whitelist commands
@@ -86,9 +129,10 @@ export class AdminManagedClustersService {
       );
   }
 
-  runPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-    return this.runCommandInCluster(InClusterDiagnosticCommands.GET_NODE, "");
+  runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
+      return this.runCommandInCluster(InClusterDiagnosticCommands.GET_NODE, "");    
   }
+
 
   getPeriscopeConfig(): Observable<PeriscopeConfig> {
     // runComand kubectl get configmap periscope -n kube-system -o yaml, for now return empty;

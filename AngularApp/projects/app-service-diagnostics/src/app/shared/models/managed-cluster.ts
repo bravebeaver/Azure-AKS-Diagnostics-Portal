@@ -23,7 +23,7 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
     servicePrincipalProfile: ServicePrincipalProfile;
     windowsProfile: WindowProfile;
     enableRBAC: boolean;
-
+  
     diagnosticSettings: InClusterDiagnosticSettings;
 }
 

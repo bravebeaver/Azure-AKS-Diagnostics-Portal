@@ -12,6 +12,7 @@ import { AdminManagedClustersService } from '../../../../shared-v2/services/admi
 import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { map, switchMap } from 'rxjs/operators';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'aks-periscope',
@@ -31,7 +32,7 @@ export class AksPeriscopeComponent implements OnInit {
   // UI Stuff
   status: ToolStatus = ToolStatus.Loading;
   toolStatus = ToolStatus;
-  periscopeRunningStatus: string = "";
+  diagnosticToolRunningStatus: string[] = [];
 
   validConfiguration: boolean = false;
   validationError: string = "";
@@ -91,40 +92,51 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   startPeriscope() {
-    // if (this.validateConfiguration()) {
-    //   this.status = toolStatus.RunningDiagnosticTools;
+    this.validConfiguration = true;
+    this.status = ToolStatus.RunningDiagnosticTools;
+    this.startPeriscopeInternal().subscribe((result: string) => {
+      this.diagnosticToolRunningStatus.push(`command result ...\n ${result}`);
+      this.status = ToolStatus.Loaded;
+      this.validConfiguration = false;
+    });    
+  }
 
-    // } else {
-    //   //error is populated by validateConfiguration
-    //   this.status = toolStatus.Error;
-    // }
-    this._adminManagedCluster.runPeriscope(this.periscopeConfig).pipe(
+  startPeriscopeInternal(): Observable<string> {
+    if (this._managedClusterService.isPrivateCluster()) {
+      return this.runCommandPersicope().pipe(
+        map((runCommandResult: RunCommandResult) => {
+          return JSON.stringify(runCommandResult);
+        })
+      );
+    } else {
+      return this._adminManagedCluster.runKubectlPeriscope(this.periscopeConfig);
+    }
+  }
+
+  runCommandPersicope(): Observable<RunCommandResult> {
+    return this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
       map((submitCommandResult: RunCommandResult) => {
-        this.periscopeRunningStatus = `Command submitted with ID - ${JSON.stringify(submitCommandResult)}, checking results...`;
-        this.status = ToolStatus.RunningDiagnosticTools;
+        this.diagnosticToolRunningStatus.push( `Command submitted with ID - ${JSON.stringify(submitCommandResult)}, checking results...`);
         return submitCommandResult; // dont change anything
       }),
       switchMap( (submitCommandResult: RunCommandResult) => {
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
-    ).subscribe((runCommandResult: RunCommandResult) => {
-        this.periscopeRunningStatus = `command result ...${JSON.stringify(runCommandResult)}`;
-        this.status = ToolStatus.Loaded;
-      });
-  } 
+    );
+  }
     
   toggleStorageAccountPanel() {
 
   }
   
   validateConfiguration(): boolean {
-    if (this.storageAccountSasString == null || this.storageAccountSasString == "") {
-      return false;
-    }    
+    // if (this.storageAccountSasString == null || this.storageAccountSasString == "") {
+    //   return false;
+    // }    
 
-    if (this.diagnosticRunId == null || this.diagnosticRunId == "") {
-      return false;
-    }
+    // if (this.diagnosticRunId == null || this.diagnosticRunId == "") {
+    //   return false;
+    // }
 
     return true;
   }
