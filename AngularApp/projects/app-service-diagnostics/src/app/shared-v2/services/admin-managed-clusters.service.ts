@@ -9,6 +9,7 @@ import { CredentialResult, CredentialResults, KubeConfigCredentials, RunCommandR
 import { ManagedCluster, PeriscopeConfig} from '../../shared/models/managed-cluster';
 import { ManagedClustersService } from './managed-clusters.service';
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
+import  * as JSZip  from 'jszip';
 
 import * as yaml from 'yaml';
 
@@ -131,9 +132,29 @@ export class AdminManagedClustersService {
   }
 
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-      return this.runCommandInCluster(InClusterDiagnosticCommands.GET_NODE, "");    
+    return this.createPeriscopeContext(periscopeConfig).pipe(
+      switchMap((periscopeContext: string) => {
+        return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY_FILES} ${RunCommandContextConfig.PERISCOPE_CONTEXT}`, periscopeContext);
+    }));    
   }
 
+  createPeriscopeContext(periscopeConfig: PeriscopeConfig): Observable<string> {
+    const createNS = `
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aks-periscope
+`;
+
+    return this.convertStringToBase64(createNS, RunCommandContextConfig.PERISCOPE_CONTEXT);
+  }
+
+
+  convertStringToBase64(stringToZip: string, filename: string): Observable<string> {
+    const zip = new JSZip();
+    zip.file(filename, stringToZip);
+    return from (zip.generateAsync({type:"base64"})); 
+  }
 
   getPeriscopeConfig(): Observable<PeriscopeConfig> {
     // runComand kubectl get configmap periscope -n kube-system -o yaml, for now return empty;
@@ -144,6 +165,11 @@ export class AdminManagedClustersService {
 export enum InClusterDiagnosticCommands {
   CLUSTER_INFO = "kubectl cluster-info",
   GET_NODE = "kubectl get nodes",
+  APPLY_FILES = "kubectl apply -f",
+}
+
+export enum RunCommandContextConfig {
+  PERISCOPE_CONTEXT = "periscope.yaml",
 }
 
 export enum ManagedClusterCommandApi {

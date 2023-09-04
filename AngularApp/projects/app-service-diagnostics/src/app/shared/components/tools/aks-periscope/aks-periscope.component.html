@@ -9,29 +9,11 @@
 
   <h3>What you should know before using runCommand </h3>
   <ul>
-      <li>The runCommand is only available for AKS clusters with Azure AD enabled.</li>
-      <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
+      <li>The runCommand is only available for AKS clusters with Azure AD enabled.
+        <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
       </li>
-      <li>Assign the user_impersonation permission to the server application for the AKS cluster resource using the az ad app permission add command. 
-        <code>
-          az ad app permission add --id your-server-app-id \
-            --api your-aks-cluster-resource-id \
-            --api-permissions your-aks-cluster-user-impression-permission-id=Scope            
-        </code>
-      </li>
-      <li>Grant admin consent to the server application for the user_impersonation permission using the az ad app permission admin-consent command.
-        <code>
-          az ad app permission admin-consent --id your-server-app-id
-        </code>
-      </li>
-      <li>Generate a clusterToken. 
-        <code>
-          az account get-access-token --resource your-aks-cluster-resource-id \
-            --resource-type aad
-        </code>
-      </li>
+      <li> The periscope logs are stored in Azure Storage, please choose an account you are an owner of, or a Shared Access Service token can be used.</li>
   </ul>
-
 
   <div *ngIf="status < toolStatus.Loaded">
     <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
