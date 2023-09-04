@@ -1,18 +1,19 @@
 import { Component, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
+import { switchMap } from 'rxjs/operators';
+import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 
 import { TelemetryService } from 'diagnostic-data';
-import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
+import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
+
 import { Globals } from '../../../../globals';
 import { SharedStorageAccountService } from '../../../../shared-v2/services/shared-storage-account.service';
+import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
+import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 import { DaasService } from '../../../services/daas.service';
 
 import { ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster';
-import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
-import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
-import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
-import { map, switchMap } from 'rxjs/operators';
-import { Observable } from 'rxjs';
+
 
 @Component({
   selector: 'aks-periscope',
@@ -23,6 +24,7 @@ export class AksPeriscopeComponent implements OnInit {
 
   clusterToDiagnose: ManagedCluster = null;  
   periscopeConfig: PeriscopeConfig = null;
+
   storageAccountName: string = "";
   storageAccountContainerName: string = "";
   storageAccountConnectionString: string = "";
@@ -31,13 +33,13 @@ export class AksPeriscopeComponent implements OnInit {
 
   // UI Stuff
   status: ToolStatus = ToolStatus.Loading;
+  // to wire the eum to the angular component
   toolStatus = ToolStatus;
   diagnosticToolRunningStatus: string[] = [];
 
   validConfiguration: boolean = false;
   validationError: string = "";
   errorMessage: string;
-  error: any;
 
   constructor( 
     private globals: Globals, 
@@ -47,99 +49,83 @@ export class AksPeriscopeComponent implements OnInit {
     private _managedClusterService: ManagedClustersService, 
     private _adminManagedCluster: AdminManagedClustersService) {
       // use storage account shared service to get storage account
-      this._sharedStorageAccountService.changeEmitted$.subscribe(newStorageAccount => {
-        this.storageAccountName = newStorageAccount.name;
-        this.storageAccountConnectionString = newStorageAccount.connectionString;
-        if (this.storageAccountName) {
-          this.validationError = "";
-        }
-      }); 
+      // this._sharedStorageAccountService.changeEmitted$.subscribe(newStorageAccount => {
+      //   this.storageAccountName = newStorageAccount.name;
+      //   this.storageAccountConnectionString = newStorageAccount.connectionString;
+      //   if (this.storageAccountName) {
+      //     this.validationError = "";
+      //   }
+      // }); 
   }
   
   ngOnInit(){
     //update periscope config if storage account is re-configured;
     this._managedClusterService.getManagedCluster().subscribe(managedCluster => {
       this.clusterToDiagnose = managedCluster;   
-      this.status = ToolStatus.CheckingBlobSasUri;
+
       
-      this._adminManagedCluster.getPeriscopeConfig().subscribe(periscopeConfig => {
-        if (periscopeConfig) {
-          this.periscopeConfig = periscopeConfig; 
-          if (periscopeConfig.storageAccountSasToken) {
-            this.storageAccountName = this._daasService.getStorageAccountNameFromSasUri(periscopeConfig.storageAccountSasToken);
-          } else if (periscopeConfig.storageAccountConnectionString) {
-            this.storageAccountName = this._daasService.getStorageAccountNameFromConnectionString(periscopeConfig.storageAccountConnectionString);
-          }          
-          this.populateSettings();
-        } else if (managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.storageAccountName) {
-          this.storageAccountName = managedCluster.diagnosticSettings.storageAccountName
-        }
-      },
-      error => {
-        this.errorMessage = "Failed while fetching cluster details";
-        this.status = ToolStatus.Error;
-        this.error = error;
-      });
-
-      this.status = ToolStatus.Loaded;
-
+      // this._adminManagedCluster.getPeriscopeConfig().subscribe(periscopeConfig => {
+      //   this.status = ToolStatus.CheckingBlobSasUri;
+      //   if (periscopeConfig) {
+      //     this.periscopeConfig = periscopeConfig; 
+      //     if (periscopeConfig.storageAccountSasToken) {
+      //       this.storageAccountName = this._daasService.getStorageAccountNameFromSasUri(periscopeConfig.storageAccountSasToken);
+      //     } else if (periscopeConfig.storageAccountConnectionString) {
+      //       this.storageAccountName = this._daasService.getStorageAccountNameFromConnectionString(periscopeConfig.storageAccountConnectionString);
+      //     }          
+      //   //  this.populateSettings();
+      //   } else if (managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.storageAccountName) {
+      //     this.storageAccountName = managedCluster.diagnosticSettings.storageAccountName
+      //   }
+      //   this.status = ToolStatus.Loaded;
+      // },
+      // error => {
+      //   this.errorMessage = "Failed while fetching cluster details";
+      //   this.status = ToolStatus.Error;
+      //   this.error = error;
+      // });
     });
   }
 
-  populateSettings() {
-    this.storageAccountContainerName = this.periscopeConfig.storageAccountContainerName;
-    this.storageAccountConnectionString = this.periscopeConfig.storageAccountConnectionString;
-  }
+  // populateSettings() {
+  //   this.storageAccountContainerName = this.periscopeConfig.storageAccountContainerName;
+  //   this.storageAccountConnectionString = this.periscopeConfig.storageAccountConnectionString;
+  // }
 
-  startPeriscope() {
-    this.validConfiguration = true;
+  runInClusterPeriscope() {
+    this.validConfiguration = false;
     this.status = ToolStatus.RunningDiagnosticTools;
-    this.startPeriscopeInternal().subscribe((result: string) => {
-      this.diagnosticToolRunningStatus.push(`command result ...\n ${result}`);
-      this.status = ToolStatus.Loaded;
-      this.validConfiguration = false;
-    });    
-  }
 
-  startPeriscopeInternal(): Observable<string> {
-    if (this._managedClusterService.isPrivateCluster()) {
-      return this.runCommandPersicope().pipe(
-        map((runCommandResult: RunCommandResult) => {
-          return JSON.stringify(runCommandResult);
-        })
-      );
-    } else {
-      return this._adminManagedCluster.runKubectlPeriscope(this.periscopeConfig);
-    }
-  }
-
-  runCommandPersicope(): Observable<RunCommandResult> {
-    return this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
-      map((submitCommandResult: RunCommandResult) => {
-        this.diagnosticToolRunningStatus.push( `Command submitted with ID - ${JSON.stringify(submitCommandResult)}, checking results...`);
-        return submitCommandResult; // dont change anything
-      }),
+    this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
+        this.diagnosticToolRunningStatus.push( `Command submitted with ID - ${submitCommandResult.id}, checking results...`);
+        this.status = ToolStatus.Loading;
+
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
-    );
+    ).subscribe((runCommandResult: RunCommandResult) => {
+      this.diagnosticToolRunningStatus.push(`command result `);
+      this.diagnosticToolRunningStatus.push(`${runCommandResult.properties.logs}`);
+      this.status = ToolStatus.Loaded;
+      this.validConfiguration = true;
+    });
   }
-    
-  toggleStorageAccountPanel() {
 
-  }
+  // toggleStorageAccountPanel() {
+
+  // }
   
-  validateConfiguration(): boolean {
-    // if (this.storageAccountSasString == null || this.storageAccountSasString == "") {
-    //   return false;
-    // }    
+  // validateConfiguration(): boolean {
+  //   // if (this.storageAccountSasString == null || this.storageAccountSasString == "") {
+  //   //   return false;
+  //   // }    
 
-    // if (this.diagnosticRunId == null || this.diagnosticRunId == "") {
-    //   return false;
-    // }
+  //   // if (this.diagnosticRunId == null || this.diagnosticRunId == "") {
+  //   //   return false;
+  //   // }
 
-    return true;
-  }
+  //   return true;
+  // }
 
   // For tooltip display
   directionalHint = DirectionalHint.rightTopEdge;

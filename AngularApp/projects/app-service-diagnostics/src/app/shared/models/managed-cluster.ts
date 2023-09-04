@@ -27,6 +27,11 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
     diagnosticSettings: InClusterDiagnosticSettings;
 }
 
+// managed cluster with admin token
+export class PrivateManagedCluster extends ManagedCluster {
+    adminToken: string;
+}
+
 export class Identity {
     principalId: string;
     tenantId: string;
