@@ -9,12 +9,8 @@
 
   <h3>What you should know before using runCommand </h3>
   <ul>
-      <li>Create an Azure AD server application that represents the AKS API server. This application will be used to authenticate the requests from the runCommand pod to the AKS API server.
-        <pre>
-          <code>az ad app create --display-name aks-server-app 
-          </code> 
-        </pre>
-        copy down <code>app ID </code> and <code>password</code>.
+      <li>The runCommand is only available for AKS clusters with Azure AD enabled.</li>
+      <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
       </li>
       <li>Assign the user_impersonation permission to the server application for the AKS cluster resource using the az ad app permission add command. 
         <code>

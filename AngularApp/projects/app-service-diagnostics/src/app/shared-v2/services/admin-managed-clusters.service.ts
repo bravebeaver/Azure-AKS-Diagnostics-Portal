@@ -5,7 +5,7 @@ import { map, switchMap,takeWhile, takeLast } from 'rxjs/operators';
 
 import { ArmService } from '../../shared/services/arm.service';
 
-import { CredentialResult, CredentialResults, K8sContext, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
+import { CredentialResult, CredentialResults, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { ManagedCluster, PeriscopeConfig} from '../../shared/models/managed-cluster';
 import { ManagedClustersService } from './managed-clusters.service';
 import { HttpClient, HttpHeaders, HttpResponse } from '@angular/common/http';
@@ -14,7 +14,6 @@ import * as yaml from 'yaml';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
 const RUN_COMMAND_INTERVAL_MS: number = 5000;
-const RUN_COMMAND_TIMEOUT_MS: number = 380000; 
 
 @Injectable()
 export class AdminManagedClustersService {
