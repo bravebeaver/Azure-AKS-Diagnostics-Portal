@@ -29,7 +29,7 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
 
 // managed cluster with admin token
 export class PrivateManagedCluster extends ManagedCluster {
-    adminToken: string;
+    adminToken?: string;
 }
 
 export class Identity {

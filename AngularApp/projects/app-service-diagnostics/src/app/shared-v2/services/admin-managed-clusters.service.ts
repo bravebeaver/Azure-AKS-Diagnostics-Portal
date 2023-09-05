@@ -5,10 +5,9 @@ import * as yaml from 'yaml';
 
 
 import {BehaviorSubject,  Observable,  from, of, timer,  forkJoin } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast} from 'rxjs/operators';
+import { map, switchMap,takeWhile, takeLast, tap} from 'rxjs/operators';
 
 import { ArmService } from '../../shared/services/arm.service';
-import { environment } from 'projects/app-service-diagnostics/src/environments/environment';
 
 import { CredentialResult, CredentialResults, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { ManagedCluster, PeriscopeConfig, PrivateManagedCluster} from '../../shared/models/managed-cluster';
@@ -26,16 +25,21 @@ export class AdminManagedClustersService {
     private _managedClusterService: ManagedClustersService, 
     private _armService: ArmService) {
 
-      forkJoin({
-        managedCluster: this._managedClusterService.getManagedCluster(), 
-        userCredentiuals: this._managedClusterService.getManagedCluster().pipe(
-          switchMap((cluster: ManagedCluster) => {
-            return this.getClientAdminCredentials(cluster);
-          }))
-      }).subscribe((result: {managedCluster: ManagedCluster, userCredentiuals: CredentialResult}) => {
-        const privateManagedCluster : PrivateManagedCluster = {...result.managedCluster, adminToken: result.userCredentiuals.kubeconfig.users[0].user.token};
-        this.privateManagedCluster.next(privateManagedCluster);
-      });
+    this._managedClusterService.getManagedCluster().pipe(
+      switchMap((cluster: ManagedCluster) => {
+        return this.getClientAdminCredentials(cluster).pipe(
+          map((userCredentials: CredentialResult) => {
+            const privateManagedCluster: PrivateManagedCluster = {
+              ...cluster,
+              adminToken: userCredentials.kubeconfig.users[0].user.token
+            };
+            return privateManagedCluster;
+          })
+        );
+      })
+    ).subscribe((privateManagedCluster: PrivateManagedCluster) => {;
+      this.privateManagedCluster.next(privateManagedCluster);
+    });
   }
 
   // POST https://management.azure.com/${resourceUri}/listClusterAdminCredential?api-version=2023-07-01
@@ -101,12 +105,12 @@ export class AdminManagedClustersService {
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
     return this.createPeriscopeContext(periscopeConfig).pipe(
       switchMap((periscopeContext: string) => {
-        return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY_FILES} ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
+        return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -f ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
     }));    
   }
 
   runCommandKustomizePeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-    return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY_FILES} ${RunCommandContextConfig.PERISCOPE_KUSTOMIZE_MANIFEST}`, 
+    return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -k ${RunCommandContextConfig.PERISCOPE_KUSTOMIZE_MANIFEST}`, 
     this.createPeriscopeContextUsingKustomize(periscopeConfig));
   }
 
@@ -216,12 +220,13 @@ rules:
 export enum InClusterDiagnosticCommands {
   GET_CLUSTER_INFO = "kubectl cluster-info",
   GET_NODE = "kubectl get nodes",
-  APPLY_FILES = "kubectl apply",
+  APPLY = "kubectl apply",
 }
 
 export enum RunCommandContextConfig {
-  PERISCOPE_MANIFEST = " -f periscope.yaml",
-  PERISCOPE_KUSTOMIZE_MANIFEST = " -k periscope",
+  
+  PERISCOPE_MANIFEST = "periscope.yaml",
+  PERISCOPE_KUSTOMIZE_MANIFEST = "periscope",
 }
 
 export enum ManagedClusterCommandApi {
