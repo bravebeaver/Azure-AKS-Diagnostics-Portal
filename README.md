@@ -73,13 +73,16 @@ root
 3. Add Auth Token and ResourceID to Local Environment Settings:
    - Paste the ArmClient token from the above step into `authServiceToken` in `environment.local.ts`
    - Copy the ID of a Resource you want to test, and paste it into `authServiceResourceId` in `environment.local.ts`
-4. Skip Authorization in ApplensBackend
+4. [Optional] if you are developing aks diagnostic v2, add the following environment variables as well: `storageAccountName`, `blobContainerName`, `sasUri`. 
+   - they are temporary and are used to get diagnostic tools started, before integrating with the portal. 
+   - the details of the configuration can be found  <a href="https://github.com/Azure/aks-periscope/tree/master/deployment/overlays/dev"> AKS Periscope</a> 
+5. Skip Authorization in ApplensBackend
    - Open `appsettings.Development.json`
    - Set `"ServerMode": "internal"`
-5. Create a self-signed certificate for Applens
+6. Create a self-signed certificate for Applens
    - Navigate to `AngularApp\ssl`
    - Follow the instructions in `AngularApp\ssl\README.md` to create a self-signed certficate and install the certificate for your local machine in Trusted Root
-6. Run the SSL server
+7. Run the SSL server
    - Run `npm run ssl-local`
    - Navigate to `https://localhost:3000` to confirm the server is up
 

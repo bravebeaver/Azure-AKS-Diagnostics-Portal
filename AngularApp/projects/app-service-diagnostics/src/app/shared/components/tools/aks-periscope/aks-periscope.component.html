@@ -35,10 +35,12 @@
       you can create <code>your-sas-token</code> using the following command:
        <pre>
         <code class="language-bash">
+          export storageAccountName='xx'
+          export subscriptionId='xx'
           sas_expiry=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
           sas=$(az storage account generate-sas \
-              --account-name $AZURE_BLOB_ACCOUNT_NAME \
-              --subscription $AZURE_SUB_ID \
+              --account-name $storageAccountName \
+              --subscription $subscriptionId \
               --permissions rlacw \
               --services b \
               --resource-types sco \
