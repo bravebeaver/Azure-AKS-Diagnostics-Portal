@@ -75,7 +75,8 @@ export class AksPeriscopeComponent implements OnInit {
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
     ).subscribe((runCommandResult: RunCommandResult) => {
-      this.diagnosticToolRunningStatus.push(`${runCommandResult.properties.logs}`);
+      const commandResult = runCommandResult.properties.logs.split('\n');
+      this.diagnosticToolRunningStatus.push( ...commandResult);
     });
   }
 
