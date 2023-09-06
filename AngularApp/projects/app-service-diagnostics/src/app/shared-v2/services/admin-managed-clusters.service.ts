@@ -271,6 +271,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: aks-periscope-service-account
+  namespace: aks-periscope
 roleRef:
   kind: ClusterRole
   name: aks-periscope-role
@@ -283,6 +284,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: aks-periscope-service-account
+  namespace: aks-periscope
 roleRef:
   kind: ClusterRole
   name: view

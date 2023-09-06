@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 import * as moment from 'moment';
 
@@ -47,12 +47,16 @@ export class AksPeriscopeComponent implements OnInit {
       this.getPeriscopeStorageAccount().subscribe((config: PeriscopeConfig) => {
         // TODO might toggle storage account later;
         this.periscopeConfig = config;
-        this.periscopeConfig.diagnosticRunId = moment().format('YYYY-MM-DDTHH:mm:ss');
+        this.updatePeriscopeRunId();
         this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
       });  
 
       this.status = ToolStatus.Loaded;
     });
+  }
+
+  updatePeriscopeRunId() {
+   this.periscopeConfig.diagnosticRunId =  moment().format('YYYY-MM-DDTHH:mm:ss');;
   }
 
   //TODO replace this with the actual storage account info;
@@ -65,6 +69,9 @@ export class AksPeriscopeComponent implements OnInit {
     this.setLoadingMessage(`Running periscope in cluster...`);
 
     this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
+      tap( (submitCommandResult: RunCommandResult) => {
+        this.updatePeriscopeRunId();
+      }),
       switchMap( (submitCommandResult: RunCommandResult) => {
         this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
@@ -73,9 +80,14 @@ export class AksPeriscopeComponent implements OnInit {
       const commandResult = runCommandResult.properties.logs.split('\n');
       this.updateRunningStatus(commandResult);
     });
+
+    //TODO poll storage account for results;
   }
+  
   updateRunningStatus(messages: string[]|string) {
     this.status = ToolStatus.Loaded;
+    this.errorMessage = null;
+    this.statusMessage = null;
 
     if (typeof messages === 'string') {
       this.diagnosticToolRunningStatus.push( messages);

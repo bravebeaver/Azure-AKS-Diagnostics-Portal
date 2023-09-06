@@ -50,12 +50,12 @@
     </li>
   </ul>
 
-  <div *ngIf="status == toolStatus.Loading; else statusUpdate">
+  <div *ngIf="status == toolStatus.Loading; else runningStatus">
     <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
   {{ statusMessage }}
   </div>
 
-  <ng-template #statusUpdate>
+  <ng-template #runningStatus>
     <ul>
       <li *ngFor="let statusUpdate of diagnosticToolRunningStatus">{{ statusUpdate }}</li>
     </ul>
