@@ -12,7 +12,6 @@
       <li>The runCommand is only available for AKS clusters with Azure AD enabled.
         <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
       </li>
-     
   </ul>
 
   <h3>Work in Progress setup to get started </h3>
@@ -28,32 +27,39 @@
             authServiceResourceId: "",
             storageAccountName: 'xx',
             blobContainerName: 'xx',
-            sasUri: '?your-sas-token', //dont forget the question mark
+            sasUri: '?your-sas-token', //the question mark is required
         </code>
       </pre>
 
       you can create <code>your-sas-token</code> using the following command:
-       <pre>
+      <pre>
         <code class="language-bash">
-          export storageAccountName='xx'
-          export subscriptionId='xx'
-          sas_expiry=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
-          sas=$(az storage account generate-sas \
-              --account-name $storageAccountName \
-              --subscription $subscriptionId \
-              --permissions rlacw \
-              --services b \
-              --resource-types sco \
-              --expiry $sas_expiry \
-              -o tsv)
-          </code>
-        </pre>
-      </li>
+        export storageAccountName='xx'
+        export subscriptionId='xx'
+        sas_expiry=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
+        sas=$(az storage account generate-sas \
+            --account-name $storageAccountName \
+            --subscription $subscriptionId \
+            --permissions rlacw \
+            --services b \
+            --resource-types sco \
+            --expiry $sas_expiry \
+            -o tsv)
+        </code>
+      </pre>
+    </li>
+  </ul>
+
+  <div *ngIf="status == toolStatus.Loading; else statusUpdate">
+    <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
+  {{ statusMessage }}
+  </div>
+
+  <ng-template #statusUpdate>
+    <ul>
+      <li *ngFor="let statusUpdate of diagnosticToolRunningStatus">{{ statusUpdate }}</li>
     </ul>
-    <div *ngIf="status == toolStatus.Loading">
-      <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
-    {{ statusMessage }}
-    </div>
+  </ng-template>
 
   <div style="margin-top: 40px;">
     <collapsible-list-fabric [title]="'Configure'">
@@ -71,7 +77,7 @@
                   </fab-tooltip-host>
                 </div>
                 <div class="col-md-2">
-                  <input type="text" aria-required="false" id="diagnosticRunId" placeholder="e.g. 2023-12-12T15-20-20Z" [(ngModel)]="periscopeConfig.diagnosticRunId">
+                  <input type="text" aria-required="false" placeholder="e.g. 2023-12-12T15-20-20Z" [(ngModel)]="periscopeConfig.diagnosticRunId"/>
                 </div>  
               </div>
               <div class="col-md-3 field-label"> Storage account <span class="required">*</span>
@@ -82,7 +88,7 @@
                   <img src="assets/img/info.svg" title="storage-account"/>
                 </fab-tooltip-host>
                 <div class="col-md-2">
-                  {{ storageAccountName }} - {{ storageAccountContainerName }}
+                  {{ periscopeConfig.storageAccountName }} - {{ periscopeConfig.storageAccountContainerName }}
                 </div>  
               </div>
               <!-- <div class="col-md-2">
@@ -109,14 +115,8 @@
           </div>
                 <!--TODO list existing periscope runs -->
         </div>
-        <div header class="container">
-          <div header class="summaryText">
-            <ul>
-              <li *ngFor="let statusUpdate of diagnosticToolRunningStatus">{{ statusUpdate }}</li>
-            </ul>
-          </div>
-        </div>
       </collapsible-list-item>
+
     </collapsible-list-fabric>
   </div>
 </div>

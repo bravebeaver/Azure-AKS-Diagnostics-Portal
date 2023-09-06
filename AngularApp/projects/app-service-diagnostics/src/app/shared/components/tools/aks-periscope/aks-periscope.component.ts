@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
 import { switchMap } from 'rxjs/operators';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
+import * as moment from 'moment';
 
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 
@@ -21,12 +22,7 @@ import { Observable, of } from 'rxjs';
 export class AksPeriscopeComponent implements OnInit {
 
   clusterToDiagnose: ManagedCluster = null;  
-  periscopeConfig: PeriscopeConfig = new PeriscopeConfig();
-
-  // storageAccountConnectionString: string = "";
-  storageAccountSasString: string = "";
-  storageAccountName: string = "";
-  storageAccountContainerName: string = "";
+  periscopeConfig: PeriscopeConfig = null;
 
   // UI Stuff
   status: ToolStatus = ToolStatus.Loading;
@@ -47,8 +43,12 @@ export class AksPeriscopeComponent implements OnInit {
     this.setLoadingMessage("Loading cluster information...");
     this._managedClusterService.getManagedCluster().subscribe(managedCluster => {
       this.clusterToDiagnose = managedCluster; 
-      this.getStorageAccount().subscribe(() => {
-        this.validateConfiguration();
+      this.setLoadingMessage("Loading storage account information...");
+      this.getPeriscopeStorageAccount().subscribe((config: PeriscopeConfig) => {
+        // TODO might toggle storage account later;
+        this.periscopeConfig = config;
+        this.periscopeConfig.diagnosticRunId = moment().format('YYYY-MM-DDTHH:mm:ss');
+        this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
       });  
 
       this.status = ToolStatus.Loaded;
@@ -56,42 +56,37 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   //TODO replace this with the actual storage account info;
-  getStorageAccount(): Observable<boolean> {
-    this.setLoadingMessage("Loading storage account information...");
-
-    this.storageAccountName = environment.storageAccountName;
-    this.storageAccountContainerName = environment.blobContainerName;
-    this.storageAccountSasString = environment.sasUri;
-    return of(true);
+  getPeriscopeStorageAccount(): Observable<PeriscopeConfig> {
+    const pericopeConfig = new PeriscopeConfig(environment.storageAccountName, environment.blobContainerName, environment.sasUri);
+    return of (pericopeConfig);
   }
 
   runInClusterPeriscope() {
-    this.setLoadingMessage("Running periscope in cluster...");
+    this.setLoadingMessage(`Running periscope in cluster...`);
 
     this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
-        this.diagnosticToolRunningStatus.push( `Command submitted with ID - ${submitCommandResult.id}, checking results...`);
-        this.status = ToolStatus.Loaded;
+        this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
     ).subscribe((runCommandResult: RunCommandResult) => {
       const commandResult = runCommandResult.properties.logs.split('\n');
-      this.diagnosticToolRunningStatus.push( ...commandResult);
+      this.updateRunningStatus(commandResult);
     });
+  }
+  updateRunningStatus(messages: string[]|string) {
+    this.status = ToolStatus.Loaded;
+
+    if (typeof messages === 'string') {
+      this.diagnosticToolRunningStatus.push( messages);
+    } else {
+      this.diagnosticToolRunningStatus.push( ...messages);
+    }
   }
 
   setLoadingMessage(message: string) {
     this.status = ToolStatus.Loading;
     this.statusMessage = message;
-  }
-
-  validateConfiguration() {
-    if (this.storageAccountSasString == null || this.storageAccountName == null || this.storageAccountContainerName == null) {
-      this.setErrorMessage( "could not read storage account setup from environment variables");
-      this.validConfiguration = false;  
-    } else {
-      this.validConfiguration = true;  
-    }
   }
 
   setErrorMessage(message: string) {

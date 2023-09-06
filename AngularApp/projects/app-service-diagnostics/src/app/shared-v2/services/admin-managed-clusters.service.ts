@@ -1,11 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpResponse } from '@angular/common/http';
+//TODO replace with pako
 import  * as JSZip  from 'jszip';
 import * as yaml from 'yaml';
 
 
-import {BehaviorSubject,  Observable,  from, of, timer,  forkJoin } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast, tap} from 'rxjs/operators';
+import {BehaviorSubject,  Observable,  from, of, timer } from 'rxjs';
+import { map, switchMap,takeWhile, takeLast} from 'rxjs/operators';
+import { StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
 
@@ -15,7 +17,7 @@ import { ManagedClustersService } from './managed-clusters.service';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
 const RUN_COMMAND_INTERVAL_MS: number = 5000;
-const YAML_SEPARATOR: string = "---";
+const YAML_SEPARATOR: string = "---\n";
 @Injectable()
 export class AdminManagedClustersService {
   // the admin client exec kubectl command in cluster, need cluster token and not broadcast to other components
@@ -159,14 +161,79 @@ export class AdminManagedClustersService {
 
   // TODO this is rather silly, find another way to interact with kustomize
   createPeriscopeContext(periscopeConfig: PeriscopeConfig): Observable<string> {
-    const createNS = `
+    // const nsObject = yaml.parseDocument(createNS);
+    // const clusterRoleObject = yaml.parseDocument(createClusterRole);
+    // TODO windows nodes seem to have different config, upgrade later;
+    const persicopeManifest =[namespace, clusterRoleAndBinding, crd, daemonSet, serviceAccount, this.createPeriscopeConfigMap(periscopeConfig), this.createPeriscopeSecretMainfest(periscopeConfig)].join(YAML_SEPARATOR);
+    return this.convertStringToBase64(persicopeManifest, RunCommandContextConfig.PERISCOPE_MANIFEST);
+  }
+
+  createPeriscopeSecretMainfest(periscopeConfig: PeriscopeConfig) {
+    const secretManifest = {
+      apiVersion: 'v1',
+      data: {
+        AZURE_BLOB_ACCOUNT_NAME: StringUtilities.convertStringToBase64(periscopeConfig.storageAccountName),
+        AZURE_BLOB_CONTAINER_NAME: StringUtilities.convertStringToBase64(periscopeConfig.storageAccountContainerName),
+        AZURE_BLOB_SAS_KEY: StringUtilities.convertStringToBase64(periscopeConfig.storageAccountSasToken),
+      },
+      kind: 'Secret',
+      metadata: {
+        name: 'azureblob-secret',
+        namespace: 'aks-periscope',
+      },
+      type: 'Opaque',
+    };
+    return  yaml.stringify(secretManifest);
+  }
+
+  createPeriscopeConfigMap(periscopeConfig: PeriscopeConfig) {
+    const configMapManifest = {
+      apiVersion: 'v1',
+      data: {
+        DIAGNOSTIC_RUN_ID: periscopeConfig.diagnosticRunId,
+      },
+      kind: 'ConfigMap',
+      metadata: {
+        name: 'diagnostic-config',
+        namespace: 'aks-periscope',
+      }
+    }; 
+   return yaml.stringify(configMapManifest);
+  }
+
+  convertStringToBase64(stringToZip: string, filename: string): Observable<string> {
+    const zip = new JSZip();
+    zip.file(filename, stringToZip);
+    return from (zip.generateAsync({type:"base64"})); 
+  }
+}
+
+export enum InClusterDiagnosticCommands {
+  GET_CLUSTER_INFO = "kubectl cluster-info",
+  GET_NODE = "kubectl get nodes",
+  APPLY = "kubectl apply",
+}
+
+export enum RunCommandContextConfig {
+  
+  PERISCOPE_MANIFEST = "periscope.yaml",
+  PERISCOPE_KUSTOMIZE_MANIFEST = "periscope",
+}
+
+export enum ManagedClusterCommandApi {
+  LIST_CLUSTER_ADMIN_CREDENTIAL = "listClusterAdminCredential",
+  RUN_COMMAND = "runCommand",
+  GET_COMMAND_RESULT = "commandResults"
+}
+
+const namespace = `
 apiVersion: v1
 kind: Namespace
 metadata:
   name: aks-periscope
 `;
 
-const createClusterRole = `
+const clusterRoleAndBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -196,41 +263,194 @@ rules:
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
   verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aks-periscope-role-binding
+subjects:
+- kind: ServiceAccount
+  name: aks-periscope-service-account
+roleRef:
+  kind: ClusterRole
+  name: aks-periscope-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aks-periscope-role-binding-view
+subjects:
+- kind: ServiceAccount
+  name: aks-periscope-service-account
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
 `;
 
-    // const nsObject = yaml.parseDocument(createNS);
-    // const clusterRoleObject = yaml.parseDocument(createClusterRole);
-    const persicopeManifest =[createNS, createClusterRole].join(YAML_SEPARATOR);
-    return this.convertStringToBase64(persicopeManifest, RunCommandContextConfig.PERISCOPE_MANIFEST);
-  }
+const crd = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: diagnostics.aks-periscope.azure.github.com
+spec:
+  group: aks-periscope.azure.github.com
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              dns:
+                type: string
+              networkoutbound:
+                type: string
+              networkconfig:
+                type: string
+  scope: Namespaced
+  names:
+    plural: diagnostics
+    singular: diagnostic
+    kind: Diagnostic
+    shortNames:
+    - apd
+`;
 
+const daemonSet = `
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aks-periscope
+  labels:
+    app: aks-periscope
+spec:
+  selector:
+    matchLabels:
+      app: aks-periscope
+  template:
+    metadata:
+      labels:
+        app: aks-periscope
+    spec:
+      serviceAccountName: aks-periscope-service-account
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+      - name: aks-periscope
+        image: periscope-linux
+        securityContext:
+          privileged: true
+        imagePullPolicy: Always
+        env:
+        - name: HOST_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: diag-config-volume
+          mountPath: /config
+        - name: storage-secret-volume
+          mountPath: /secret
+        - name: varlog
+          mountPath: /var/log
+        - name: resolvlog
+          mountPath: /run/systemd/resolve
+        - name: etcvmlog
+          mountPath: /etchostlogs
+        resources:
+          requests:
+            memory: "40Mi"
+            cpu: "1m"
+          limits:
+            memory: "500Mi"
+            cpu: "1000m"
+      volumes:
+      - name: diag-config-volume
+        configMap:
+          name: diagnostic-config
+      - name: storage-secret-volume
+        secret:
+          secretName: azureblob-secret
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: resolvlog
+        hostPath:
+          path: /run/systemd/resolve
+      - name: etcvmlog
+        hostPath:
+          path: /etc
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aks-periscope-win
+  labels:
+    app: aks-periscope
+spec:
+  selector:
+    matchLabels:
+      app: aks-periscope
+  template:
+    metadata:
+      labels:
+        app: aks-periscope
+    spec:
+      serviceAccountName: aks-periscope-service-account
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: windows
+      containers:
+      - name: aks-periscope
+        image: periscope-windows
+        imagePullPolicy: Always
+        env:
+        - name: HOST_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: diag-config-volume
+          mountPath: /config
+        - name: storage-secret-volume
+          mountPath: /secret
+        - name: k
+          mountPath: /k
+        - name: azuredata
+          mountPath: /AzureData
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: diag-config-volume
+        configMap:
+          name: diagnostic-config
+      - name: storage-secret-volume
+        secret:
+          secretName: azureblob-secret
+      - name: k
+        hostPath:
+          path: /k
+      - name: azuredata
+        hostPath:
+          path: /AzureData
+`;
 
-  convertStringToBase64(stringToZip: string, filename: string): Observable<string> {
-    const zip = new JSZip();
-    zip.file(filename, stringToZip);
-    return from (zip.generateAsync({type:"base64"})); 
-  }
+const serviceAccount = `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aks-periscope-service-account
+`;
 
-  // getPeriscopeConfig(): Observable<PeriscopeConfig> {
-  //   // runComand kubectl get configmap periscope -n kube-system -o yaml, for now return empty;
-  //   return EMPTY;
-  // }
-}
-
-export enum InClusterDiagnosticCommands {
-  GET_CLUSTER_INFO = "kubectl cluster-info",
-  GET_NODE = "kubectl get nodes",
-  APPLY = "kubectl apply",
-}
-
-export enum RunCommandContextConfig {
-  
-  PERISCOPE_MANIFEST = "periscope.yaml",
-  PERISCOPE_KUSTOMIZE_MANIFEST = "periscope",
-}
-
-export enum ManagedClusterCommandApi {
-  LIST_CLUSTER_ADMIN_CREDENTIAL = "listClusterAdminCredential",
-  RUN_COMMAND = "runCommand",
-  GET_COMMAND_RESULT = "commandResults"
-}

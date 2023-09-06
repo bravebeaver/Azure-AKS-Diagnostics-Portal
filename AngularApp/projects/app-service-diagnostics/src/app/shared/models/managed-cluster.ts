@@ -60,12 +60,24 @@ export class InClusterDiagnosticSettings {
 
 
 export class PeriscopeConfig {
-    diagnosticRunId: string;
-    linuxTag: string;
-    windowsTag: string;
+    diagnosticRunId?: string;
+    linuxTag?: string;
+    windowsTag?: string;
     
     storageAccountName: string;
     storageAccountContainerName: string;
     storageAccountSasToken: string;
-    storageAccountConnectionString: string;   
+    storageAccountConnectionString?: string;   
+
+    constructor(storageAccountName: string, storageAccountContainerName: string, storageAccountSasToken: string) {
+        this.storageAccountName = storageAccountName;
+        this.storageAccountContainerName = storageAccountContainerName;
+        this.storageAccountSasToken = storageAccountSasToken;
+    }
+
+    validate(): boolean {
+        return! (this.storageAccountName == null || 
+            this.storageAccountContainerName == null || 
+            this.storageAccountSasToken == null);
+    }
 }

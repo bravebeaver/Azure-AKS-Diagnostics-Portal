@@ -201,4 +201,8 @@ export class StringUtilities {
     public static IsNullOrWhiteSpace(input:string) {
         return input ? this.ReplaceAll(input, ' ', '').length < 1: true;
     }
+
+    public static convertStringToBase64(myString: string): string {
+        return btoa(myString);
+      }
 }
