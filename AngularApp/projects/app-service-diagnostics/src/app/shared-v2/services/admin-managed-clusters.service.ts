@@ -165,7 +165,7 @@ export class AdminManagedClustersService {
     // const clusterRoleObject = yaml.parseDocument(createClusterRole);
     // TODO windows nodes seem to have different config, upgrade later;
     const persicopeManifest =[namespace, clusterRoleAndBinding, crd, daemonSet, serviceAccount, this.createPeriscopeConfigMap(periscopeConfig), this.createPeriscopeSecretMainfest(periscopeConfig)].join(YAML_SEPARATOR);
-    return this.convertStringToBase64(persicopeManifest, RunCommandContextConfig.PERISCOPE_MANIFEST);
+    return this.zipStringToBase64(persicopeManifest, RunCommandContextConfig.PERISCOPE_MANIFEST);
   }
 
   createPeriscopeSecretMainfest(periscopeConfig: PeriscopeConfig) {
@@ -201,7 +201,7 @@ export class AdminManagedClustersService {
    return yaml.stringify(configMapManifest);
   }
 
-  convertStringToBase64(stringToZip: string, filename: string): Observable<string> {
+  zipStringToBase64(stringToZip: string, filename: string): Observable<string> {
     const zip = new JSZip();
     zip.file(filename, stringToZip);
     return from (zip.generateAsync({type:"base64"})); 
