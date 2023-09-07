@@ -163,9 +163,23 @@ export class AdminManagedClustersService {
   createPeriscopeContext(periscopeConfig: PeriscopeConfig): Observable<string> {
     // const nsObject = yaml.parseDocument(createNS);
     // const clusterRoleObject = yaml.parseDocument(createClusterRole);
-    // TODO windows nodes seem to have different config, upgrade later;
-    const persicopeManifest =[namespace, clusterRoleAndBinding, crd, daemonSet, serviceAccount, this.createPeriscopeConfigMap(periscopeConfig), this.createPeriscopeSecretMainfest(periscopeConfig)].join(YAML_SEPARATOR);
-    return this.zipStringToBase64(persicopeManifest, RunCommandContextConfig.PERISCOPE_MANIFEST);
+    const persicopeManifest: string[] = [];
+    persicopeManifest.push(namespace,clusterRoleAndBinding, crd, serviceAccount);
+    persicopeManifest.push(this.createPeriscopeConfigMap(periscopeConfig), this.createPeriscopeSecretMainfest(periscopeConfig));
+    persicopeManifest.push(...this.createPeriscopeLinuxComponents(periscopeConfig)); 
+     // TODO only when cluster has windows nodes
+    if (this.privateManagedCluster.getValue().windowsProfile) {
+      persicopeManifest.push(...this.createPeriscopeWindowsComponents(periscopeConfig)); 
+    }  
+    return this.zipStringToBase64(persicopeManifest.join(YAML_SEPARATOR), RunCommandContextConfig.PERISCOPE_MANIFEST);
+  }
+
+  createPeriscopeWindowsComponents(periscopeConfig: PeriscopeConfig): string[] {
+    return [this.createPeriscopeDaemonsetMainfest(periscopeConfig)];
+  }
+  
+  createPeriscopeLinuxComponents(periscopeConfig: PeriscopeConfig): string[] {
+   return [this.createPeriscopeDaemonsetLinuxManifest(periscopeConfig)];
   }
 
   createPeriscopeSecretMainfest(periscopeConfig: PeriscopeConfig) {
@@ -206,7 +220,205 @@ export class AdminManagedClustersService {
     zip.file(filename, stringToZip);
     return from (zip.generateAsync({type:"base64"})); 
   }
+
+  createPeriscopeDaemonsetLinuxManifest(periscopeConfig: PeriscopeConfig): string {
+    const linuxDaemonsetManifest = {
+      apiVersion: "apps/v1",
+      kind: "DaemonSet",
+      metadata: {
+        name: "aks-periscope",
+        namespace: "aks-periscope",
+        labels: {
+            app: "aks-periscope"
+        }
+      },
+      spec: {
+        selector: {
+          matchLabels: {
+            app: "aks-periscope"
+          }
+        },
+        template: {
+          metadata: {
+            labels: {
+              app: "aks-periscope"
+            }
+          },
+          spec: {
+            serviceAccountName: "aks-periscope-service-account",
+            hostPID: true,
+            nodeSelector: {
+                "kubernetes.io/os": "linux"
+            },
+            containers: [{
+              name: "aks-periscope",
+              image: "mcr.microsoft.com/aks/periscope:"+ periscopeConfig.linuxTag,
+              securityContext: {
+                privileged: true
+              },
+              imagePullPolicy: "Always",
+              env: [{
+                name: "HOST_NODE_NAME",
+                valueFrom: {
+                  fieldRef: {
+                    fieldPath: "spec.nodeName"
+                  }
+                }
+              }],
+              volumeMounts: [{
+                name: "diag-config-volume",
+                mountPath: "/config"
+              },{
+                name: "storage-secret-volume",
+                mountPath: "/secret"
+              },{
+                name: "varlog",
+                mountPath: "/var/log"
+              },{
+                name: "resolvlog",
+                mountPath: "/run/systemd/resolve"
+              },{
+                name: "etcvmlog",
+                mountPath: "/etchostlogs"
+              }],
+              resources: {
+                requests: {
+                  memory: "40Mi",
+                  cpu: "1m"
+                },
+                limits: {
+                  memory: "500Mi",
+                  cpu: "1000m"
+                }
+              }
+            }],
+            volumes: [{
+              name: "diag-config-volume",
+              configMap: {
+                  name: "diagnostic-config"
+              }
+            },{
+              name: "storage-secret-volume",
+              secret: {
+                  secretName: "azureblob-secret"
+              }
+            },{
+              name: "varlog",
+              hostPath: {
+                  path: "/var/log"
+              }
+            },{
+              name: "resolvlog",
+              hostPath: {
+                  path: "/run/systemd/resolve"
+              }
+            },{
+              name: "etcvmlog",
+              hostPath: {
+                  path: "/etc"
+              }
+            }]
+          }
+        }  
+      }
+    };
+    return yaml.stringify(linuxDaemonsetManifest);
+  }
+
+  createPeriscopeDaemonsetMainfest(periscopeConfig: PeriscopeConfig): string {
+    const windowsDaemonsetManifest = {
+      apiVersion: "apps/v1",
+      kind: "DaemonSet",
+      metadata: {
+        name: "aks-periscope-win",
+        namespace: "aks-periscope",
+        labels: {
+            app: "aks-periscope",
+        },
+      },
+      spec: {
+        selector: {
+          matchLabels: {
+            app: "aks-periscope",
+          },
+        },
+        template: {
+          metadata: {
+            labels: {
+                app: "aks-periscope",
+            },
+          },
+          spec: {
+            serviceAccountName: "aks-periscope-service-account",
+            hostPID: true,
+            nodeSelector: {
+              "kubernetes.io/os": "windows",
+            },
+            containers: [{
+              name: "aks-periscope",
+              image: "mcr.microsoft.com/aks/periscope:"+ periscopeConfig.windowsTag,
+              imagePullPolicy: "Always",
+              env: [{
+                name: "HOST_NODE_NAME",
+                valueFrom: {
+                  fieldRef: {
+                    fieldPath: "spec.nodeName",
+                  },
+                },
+              }],
+              volumeMounts: [{
+                name: "diag-config-volume",
+                mountPath: "/config",
+              },{
+                name: "storage-secret-volume",
+                mountPath: "/secret",
+              },{
+                name: "k",
+                mountPath: "/k",
+              },{
+                name: "azuredata",
+                mountPath: "/AzureData",
+              }],
+              resources: {
+                requests: {
+                  memory: "100Mi",
+                  cpu: "100m",
+                },
+                limits: {
+                  memory: "1Gi",
+                  cpu: "1000m",
+                },
+              },
+            }],
+            volumes: [{
+              name: "diag-config-volume",
+              configMap: {
+                  name: "diagnostic-config",
+              },
+            },{
+              name: "storage-secret-volume",
+              secret: {
+                secretName: "azureblob-secret",
+              },
+            },{
+              name: "k",
+              hostPath: {
+                path: "/k",
+              },
+            },{
+              name: "azuredata",
+              hostPath: {
+                path: "/AzureData",
+              },
+            }],
+          },
+        },
+      },
+    };
+    return yaml.stringify(windowsDaemonsetManifest);
+  };
 }
+
 
 export enum InClusterDiagnosticCommands {
   GET_CLUSTER_INFO = "kubectl cluster-info",
@@ -268,6 +480,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: aks-periscope-role-binding
+  namespace: aks-periscope
 subjects:
 - kind: ServiceAccount
   name: aks-periscope-service-account
@@ -296,6 +509,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: diagnostics.aks-periscope.azure.github.com
+  namespace: aks-periscope
 spec:
   group: aks-periscope.azure.github.com
   versions:
@@ -324,135 +538,12 @@ spec:
     - apd
 `;
 
-const daemonSet = `
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: aks-periscope
-  labels:
-    app: aks-periscope
-spec:
-  selector:
-    matchLabels:
-      app: aks-periscope
-  template:
-    metadata:
-      labels:
-        app: aks-periscope
-    spec:
-      serviceAccountName: aks-periscope-service-account
-      hostPID: true
-      nodeSelector:
-        kubernetes.io/os: linux
-      containers:
-      - name: aks-periscope
-        image: periscope-linux
-        securityContext:
-          privileged: true
-        imagePullPolicy: Always
-        env:
-        - name: HOST_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        volumeMounts:
-        - name: diag-config-volume
-          mountPath: /config
-        - name: storage-secret-volume
-          mountPath: /secret
-        - name: varlog
-          mountPath: /var/log
-        - name: resolvlog
-          mountPath: /run/systemd/resolve
-        - name: etcvmlog
-          mountPath: /etchostlogs
-        resources:
-          requests:
-            memory: "40Mi"
-            cpu: "1m"
-          limits:
-            memory: "500Mi"
-            cpu: "1000m"
-      volumes:
-      - name: diag-config-volume
-        configMap:
-          name: diagnostic-config
-      - name: storage-secret-volume
-        secret:
-          secretName: azureblob-secret
-      - name: varlog
-        hostPath:
-          path: /var/log
-      - name: resolvlog
-        hostPath:
-          path: /run/systemd/resolve
-      - name: etcvmlog
-        hostPath:
-          path: /etc
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: aks-periscope-win
-  labels:
-    app: aks-periscope
-spec:
-  selector:
-    matchLabels:
-      app: aks-periscope
-  template:
-    metadata:
-      labels:
-        app: aks-periscope
-    spec:
-      serviceAccountName: aks-periscope-service-account
-      hostPID: true
-      nodeSelector:
-        kubernetes.io/os: windows
-      containers:
-      - name: aks-periscope
-        image: periscope-windows
-        imagePullPolicy: Always
-        env:
-        - name: HOST_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        volumeMounts:
-        - name: diag-config-volume
-          mountPath: /config
-        - name: storage-secret-volume
-          mountPath: /secret
-        - name: k
-          mountPath: /k
-        - name: azuredata
-          mountPath: /AzureData
-        resources:
-          requests:
-            memory: "100Mi"
-            cpu: "100m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-      volumes:
-      - name: diag-config-volume
-        configMap:
-          name: diagnostic-config
-      - name: storage-secret-volume
-        secret:
-          secretName: azureblob-secret
-      - name: k
-        hostPath:
-          path: /k
-      - name: azuredata
-        hostPath:
-          path: /AzureData
-`;
 
 const serviceAccount = `
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: aks-periscope-service-account
+  namespace: aks-periscope
 `;
 

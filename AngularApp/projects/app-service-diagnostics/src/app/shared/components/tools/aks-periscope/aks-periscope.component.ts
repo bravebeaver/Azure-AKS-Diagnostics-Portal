@@ -48,6 +48,9 @@ export class AksPeriscopeComponent implements OnInit {
         // TODO might toggle storage account later;
         this.periscopeConfig = config;
         this.updatePeriscopeRunId();
+        // TODO fetch possible periscope releases, for now just use the latest;
+        this.periscopeConfig.linuxTag = '0.0.13';
+        this.periscopeConfig.windowsTag = '0.0.13';
         this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
       });  
 
