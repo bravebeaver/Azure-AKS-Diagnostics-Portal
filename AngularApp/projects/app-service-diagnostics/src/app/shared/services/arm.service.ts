@@ -22,10 +22,12 @@ const APOLLO_SOLUTION_ID: string = 'a9fab365-c9b7-4a35-b433-c5537ca70603'
 
 @Injectable()
 export class ArmService {
+
     public subscriptions = new ReplaySubject<Subscription[]>(1);
 
     public armApiVersion = '2016-02-01';
     public storageApiVersion = '2015-05-01-preview';
+
     public websiteApiVersion = '2015-08-01';
     private readonly publicAzureArmUrl = 'https://management.azure.com';
     private readonly chinaAzureArmUrl = 'https://management.chinacloudapi.cn';

@@ -24,9 +24,18 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
     windowsProfile: WindowProfile;
     enableRBAC: boolean;
   
-    diagnosticSettings: InClusterDiagnosticSettings;
+    diagnosticSettings: DiagnosticSettingsResource[];
 }
 
+export class DiagnosticSettingsResource {
+    id: string;
+    properties: {
+        storageAccountId: string
+    };
+    name: string
+    logAnalyticsDestinationType: string;
+    storageAccountId: string;
+}
 // managed cluster with admin token
 export class PrivateManagedCluster extends ManagedCluster {
     adminToken?: string;
@@ -54,10 +63,7 @@ export class ServicePrincipalProfile {
     clientId: string;
 }
 
-export class InClusterDiagnosticSettings {
-    storageAccountName: string;
-}
-
+// from https://learn.microsoft.com/en-us/rest/api/monitor/diagnostic-settings/list?tabs=HTTP#diagnosticsettingsresource
 
 export class PeriscopeConfig {
     diagnosticRunId?: string;

@@ -27,7 +27,7 @@ export class AdminManagedClustersService {
     private _managedClusterService: ManagedClustersService, 
     private _armService: ArmService) {
 
-    this._managedClusterService.getManagedCluster().pipe(
+    this._managedClusterService.currentCluster.pipe(
       switchMap((cluster: ManagedCluster) => {
         return this.getClientAdminCredentials(cluster).pipe(
           map((userCredentials: CredentialResult) => {

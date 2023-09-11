@@ -10,7 +10,7 @@ import { AdminManagedClustersService } from '../../../../shared-v2/services/admi
 import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 import { environment } from 'projects/app-service-diagnostics/src/environments/environment';
 
-import { ManagedCluster, PeriscopeConfig } from '../../../models/managed-cluster';
+import { ManagedCluster, ManagedClusterMetaInfo, PeriscopeConfig } from '../../../models/managed-cluster';
 import { Observable, of } from 'rxjs';
 
 
@@ -41,7 +41,7 @@ export class AksPeriscopeComponent implements OnInit {
   ngOnInit(){
     //update periscope config if storage account is re-configured;
     this.setLoadingMessage("Loading cluster information...");
-    this._managedClusterService.getManagedCluster().subscribe(managedCluster => {
+    this._managedClusterService.currentCluster.subscribe((managedCluster: ManagedCluster )=> {
       this.clusterToDiagnose = managedCluster; 
       this.setLoadingMessage("Loading storage account information...");
       this.getPeriscopeStorageAccount().subscribe((config: PeriscopeConfig) => {
