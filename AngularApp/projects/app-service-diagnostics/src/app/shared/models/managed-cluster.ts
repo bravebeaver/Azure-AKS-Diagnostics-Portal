@@ -63,27 +63,42 @@ export class ServicePrincipalProfile {
     clientId: string;
 }
 
+export class OwnedStorageAccountConfig {
+    storageAccountName?: string;
+
+    constructor(storageAccountName?: string) {
+        this.storageAccountName = storageAccountName;   
+    }
+}
+
 // from https://learn.microsoft.com/en-us/rest/api/monitor/diagnostic-settings/list?tabs=HTTP#diagnosticsettingsresource
+
+export class StorageAccountConfig extends OwnedStorageAccountConfig {
+    storageAccountContainerName: string;
+    storageAccountSasToken: string;
+    storageAccountConnectionString?: string;   
+
+    constructor(storageAccountName?: string, storageAccountContainerName?: string, storageAccountSasToken?: string) {
+        super(storageAccountName);
+        this.storageAccountContainerName = storageAccountContainerName;
+        this.storageAccountSasToken = storageAccountSasToken;
+    }
+}
+
+
 
 export class PeriscopeConfig {
     diagnosticRunId?: string;
     linuxTag?: string;
     windowsTag?: string;
     
-    storageAccountName: string;
-    storageAccountContainerName: string;
-    storageAccountSasToken: string;
-    storageAccountConnectionString?: string;   
+    storage: OwnedStorageAccountConfig;
 
-    constructor(storageAccountName: string, storageAccountContainerName: string, storageAccountSasToken: string) {
-        this.storageAccountName = storageAccountName;
-        this.storageAccountContainerName = storageAccountContainerName;
-        this.storageAccountSasToken = storageAccountSasToken;
-    }
-
-    validate(): boolean {
-        return! (this.storageAccountName == null || 
-            this.storageAccountContainerName == null || 
-            this.storageAccountSasToken == null);
+    storageAccountName(): string {
+        if (!this.storage) {
+            return "";
+        }
+        return  `${ this instanceof StorageAccountConfig ? (<StorageAccountConfig>this.storage).storageAccountContainerName : "Owned" } 
+                 ${this.storage.storageAccountName}`;
     }
 }

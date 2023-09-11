@@ -7,10 +7,9 @@ import * as moment from 'moment';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
-import { ManagedClustersService } from '../../../../shared-v2/services/managed-clusters.service';
 import { environment } from 'projects/app-service-diagnostics/src/environments/environment';
 
-import { ManagedCluster, ManagedClusterMetaInfo, PeriscopeConfig } from '../../../models/managed-cluster';
+import { ManagedCluster, OwnedStorageAccountConfig, PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
 import { Observable, of } from 'rxjs';
 
 
@@ -21,8 +20,8 @@ import { Observable, of } from 'rxjs';
 })
 export class AksPeriscopeComponent implements OnInit {
 
-  clusterToDiagnose: ManagedCluster = null;  
-  periscopeConfig: PeriscopeConfig = null;
+  // clusterToDiagnose: ManagedCluster = null;  
+  periscopeConfig: PeriscopeConfig = new PeriscopeConfig();
 
   // UI Stuff
   status: ToolStatus = ToolStatus.Loading;
@@ -34,26 +33,32 @@ export class AksPeriscopeComponent implements OnInit {
   errorMessage: string;
 
   constructor( 
-    private _managedClusterService: ManagedClustersService, 
     private _adminManagedCluster: AdminManagedClustersService) {
   }
   
   ngOnInit(){
     //update periscope config if storage account is re-configured;
     this.setLoadingMessage("Loading cluster information...");
-    this._managedClusterService.currentCluster.subscribe((managedCluster: ManagedCluster )=> {
-      this.clusterToDiagnose = managedCluster; 
-      this.setLoadingMessage("Loading storage account information...");
-      this.getPeriscopeStorageAccount().subscribe((config: PeriscopeConfig) => {
-        // TODO might toggle storage account later;
-        this.periscopeConfig = config;
-        this.updatePeriscopeRunId();
-        // TODO fetch possible periscope releases, for now just use the latest;
-        this.periscopeConfig.linuxTag = '0.0.13';
-        this.periscopeConfig.windowsTag = '0.0.13';
-        this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
-      });  
+    this._adminManagedCluster.currentCluster().subscribe((managedCluster: PrivateManagedCluster )=> {
 
+      this.setLoadingMessage("Loading storage account information...");
+      if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
+        this.setLoadingMessage("Cluster has diagnostic settings, use diagnostic settings ...");
+        this.periscopeConfig.storage = <OwnedStorageAccountConfig>{storageAccountName: managedCluster.diagnosticSettings[0].storageAccountId};
+      } else {
+        this.setLoadingMessage("Cluster does not have diagnostic settings, choose a storage account...");
+        this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
+          // TODO might toggle storage account later;
+          this.periscopeConfig.storage  = config;
+        });
+      } 
+      // this.clusterToDiagnose = managedCluster; 
+      this.updatePeriscopeRunId();
+      // TODO fetch possible periscope releases, for now just use the latest;
+      this.periscopeConfig.linuxTag = '0.0.13';
+      this.periscopeConfig.windowsTag = '0.0.13';
+      this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
+    
       this.status = ToolStatus.Loaded;
     });
   }
@@ -63,8 +68,8 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   //TODO replace this with the actual storage account info;
-  getPeriscopeStorageAccount(): Observable<PeriscopeConfig> {
-    const pericopeConfig = new PeriscopeConfig(environment.storageAccountName, environment.blobContainerName, environment.sasUri);
+  getPeriscopeStorageAccount(): Observable<StorageAccountConfig> {
+    const pericopeConfig = new StorageAccountConfig(environment.storageAccountName, environment.blobContainerName, environment.sasUri);
     return of (pericopeConfig);
   }
 

@@ -129,7 +129,6 @@ import { DownloadReportComponent } from './components/download-report/download-r
 import { OptInsightsService } from './services/optinsights/optinsights.service';
 import { AksPeriscopeComponent } from './components/tools/aks-periscope/aks-periscope.component';
 import { AdminManagedClustersService } from '../shared-v2/services/admin-managed-clusters.service';
-import { ManagedClustersService } from '../shared-v2/services/managed-clusters.service';
 
 @NgModule({
     declarations: [
@@ -328,8 +327,7 @@ export class SharedModule {
                 LocalBackendService,
                 ABTestingService,
                 OptInsightsService, 
-                AdminManagedClustersService, 
-                ManagedClustersService,
+                AdminManagedClustersService
             ]
         };
     }

@@ -60,7 +60,6 @@ const ResourceRoutes = RouterModule.forChild([
     ResourceService,
     SupportTopicService,
     ResourceResolver,
-    
     ManagedClustersCategoryService,
     { provide: CategoryService, useExisting: ManagedClustersCategoryService },
   ]

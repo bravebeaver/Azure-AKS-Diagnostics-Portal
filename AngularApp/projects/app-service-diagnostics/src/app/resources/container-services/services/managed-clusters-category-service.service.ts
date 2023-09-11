@@ -18,7 +18,6 @@ export class ManagedClustersCategoryService extends CategoryService{
     // add original categories from config.json
     let currConfig: ArmResourceConfig = _armConfigService.getArmResourceConfig(_resourceService.resource.id);
     if (currConfig.categories && currConfig.categories.length > 0) {
-      console.log(currConfig.categories);
       this._addCategories(currConfig.categories);
     }
     
