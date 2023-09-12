@@ -5,8 +5,8 @@ import  * as JSZip  from 'jszip';
 import * as yaml from 'yaml';
 
 
-import {BehaviorSubject,  Observable,  forkJoin,  from, identity, of, timer } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast, filter, tap} from 'rxjs/operators';
+import {BehaviorSubject,  Observable,  combineLatest,  forkJoin,  from, identity, of, timer } from 'rxjs';
+import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap} from 'rxjs/operators';
 import { StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
@@ -14,101 +14,113 @@ import { ArmService } from '../../shared/services/arm.service';
 import { CredentialResult, CredentialResults, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { DiagnosticSettingsResource, ManagedCluster, ManagedClusterMetaInfo, PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig} from '../../shared/models/managed-cluster';
 import { AuthService } from '../../startup/services/auth.service';
-import { ResourceService } from './resource.service';
 import { ResourceType, StartupInfo } from '../../shared/models/portal';
 import { ResponseMessageCollectionEnvelope, ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
+import { StorageService } from '../../shared/services/storage.service';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
 const RUN_COMMAND_INTERVAL_MS: number = 5000;
 const YAML_SEPARATOR: string = "---\n";
 @Injectable()
 export class AdminManagedClustersService {
-  // the admin client exec kubectl command in cluster, need cluster token and not broadcast to other components
-  public privateManagedCluster: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
+
+  public managedCluster: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
   public diagnosticSettingsApiVersion =  "2021-05-01-preview";
+  private updated : number = 0;
 
   constructor(
-    protected _authService: AuthService, 
-    protected _resourceService: ResourceService,
-    private _armClient: ArmService) {
+    private _authService: AuthService, 
+    private _armClient: ArmService, 
+    private _storageService: StorageService) {
     
-    console.log("constructor called - AdminManagedClustersService");
     this._authService.getStartupInfo().pipe(
       filter((startupInfo: StartupInfo) => startupInfo.resourceType === ResourceType.ManagedCluster),
+      switchMap((startUpInfo: StartupInfo) => {
+        this._populateManagedClusterMetaInfo(startUpInfo.resourceId);
 
-      map((startUpInfo: StartupInfo) => {
-        return this._populateManagedClusterMetaInfo(startUpInfo.resourceId)
+        // get cluster and admin token, both are required for run command
+        return forkJoin([
+          this._armClient.getResource<ManagedCluster>(startUpInfo.resourceId),
+          this.populateAdminCredentials(startUpInfo.resourceId)]);
       })
     ).pipe(
-      switchMap((managedClusterMetaInfo: ManagedClusterMetaInfo) => {
-        this.currentClusterMetaInfo.next(managedClusterMetaInfo);
-        return forkJoin([
-          this._armClient.getResource<ManagedCluster>(managedClusterMetaInfo.resourceUri), 
-          this.getClientAdminCredentials(managedClusterMetaInfo.resourceUri)]);
-      })
-    ).subscribe(([managedCluster, userCredentials]: [ResponseMessageEnvelope<ManagedCluster>, CredentialResult]) => {
-      let currentCluster: PrivateManagedCluster = managedCluster.properties;
-      currentCluster.resourceUri = managedCluster.id;
-      currentCluster.adminToken = userCredentials.kubeconfig.users[0].user.token;
+      mergeMap(([managedCluster, adminCredential]: [ResponseMessageEnvelope<ManagedCluster>, CredentialResult]) => {
+        let currentCluster: PrivateManagedCluster = managedCluster.properties;
+        currentCluster.resourceUri = managedCluster.id;
+        console.log(`found ${adminCredential.kubeconfig.users.length} users in admin credential. use the first one`)
+        currentCluster.adminToken = adminCredential.kubeconfig.users[0].user.token;
 
-      this.getResourceDiagnosticSettings(currentCluster.resourceUri).subscribe((diagnosticSettings: DiagnosticSettingsResource[]) => {
-        currentCluster.diagnosticSettings = diagnosticSettings;
-        this.privateManagedCluster.next(currentCluster);
-      });
+        // the cluster may or may not have diagnostics;
+        return this.getResourceDiagnosticSettings(currentCluster.resourceUri).pipe(
+          mergeMap((diagnosticSettings: DiagnosticSettingsResource[]) => {
+            currentCluster.diagnosticSettings = diagnosticSettings;
+            return of(currentCluster);
+          })
+        );
+      })
+    ).subscribe((currentCluster: PrivateManagedCluster) => {
+      console.log(`updating current cluster for the ${this.updated++} times.`)
+      this.managedCluster.next(currentCluster);
     });
   }
 
-  currentCluster(): Observable<PrivateManagedCluster> {
-    return this.privateManagedCluster.pipe(filter(privateManagedCluter  =>  !!privateManagedCluter));
+  // POST https://management.azure.com/${resourceUri}/listClusterAdminCredential?api-version=2023-07-01
+  populateAdminCredentials(resourceId: string): Observable<CredentialResult> {
+    return this._armClient.postResourceWithoutEnvelope<CredentialResults, any>(`${resourceId}/${ManagedClusterCommandApi.LIST_CLUSTER_ADMIN_CREDENTIAL}`, true).pipe(
+      filter((response: CredentialResults) => response.kubeconfigs && response.kubeconfigs.length > 0),
+      map((response: CredentialResults) => { 
+        console.log(`found ${response.kubeconfigs.length} admin credentials. use the first one`)
+        let userCredential: CredentialResult = {...response.kubeconfigs[0]};
+        userCredential.kubeconfig = yaml.parse(atob(userCredential.value)) as KubeConfigCredentials;
+        return userCredential;
+      })
+    );
   }
 
   getResourceDiagnosticSettings(resourceId: string): Observable<DiagnosticSettingsResource[]> {
-    const diagnosticSettings: DiagnosticSettingsResource[] = [];
     return this._armClient.getResourceCollection<DiagnosticSettingsResource>(`${resourceId}/providers/Microsoft.Insights/diagnosticSettings`, this.diagnosticSettingsApiVersion)
-      .pipe(map((response: {}| ResponseMessageCollectionEnvelope<DiagnosticSettingsResource>)  => {
-        if (Object.keys(response).length == 0) {
-          return diagnosticSettings;
-        } 
-        const responseValue =  (response as DiagnosticSettingsResource[]);
-        if (responseValue.length == 0) {
-          return diagnosticSettings;
+    .pipe(
+      map((response: {}|ResponseMessageCollectionEnvelope<DiagnosticSettingsResource>) => {
+        if (!!response) {
+          return response as DiagnosticSettingsResource[];
+        } else {
+          console.log(`no diagnostic settings found for ${resourceId}`);
+          return [];
         }
-        responseValue.forEach((diagnosticSetting: DiagnosticSettingsResource) => {  
-          diagnosticSetting.storageAccountId = diagnosticSetting.properties.storageAccountId;
-        });
-        return responseValue;
       }));
   }
 
-  private _populateManagedClusterMetaInfo(resourceId: string): ManagedClusterMetaInfo {
+  populateStorageAccountConfig(diagnosticSetting: DiagnosticSettingsResource): Observable<StorageAccountConfig> {
+    const resourceUri = diagnosticSetting.properties.storageAccountId;
+    console.log(`calling resolve sa for uri ${resourceUri}`);
+        
+    return this._storageService.generateSasKey(resourceUri, '').pipe(
+      map((sasKey: string) => {
+        console.log(`generating sas key. updating diagnostic settings ${resourceUri}`);
+       return <StorageAccountConfig>{sasToken: sasKey, resourceUri: resourceUri};
+    }));
+  };
+  
+  currentCluster(): Observable<PrivateManagedCluster> {
+    return this.managedCluster.pipe(filter(privateManagedCluter  =>  !!privateManagedCluter));
+  }
+
+  private _populateManagedClusterMetaInfo(resourceId: string) {
     const pieces = resourceId.toLowerCase().split('/');
-    return <ManagedClusterMetaInfo>{
+    const managedClusterMetaInfo =  <ManagedClusterMetaInfo>{
         resourceUri: resourceId,
         subscriptionId: pieces[pieces.indexOf('subscriptions') + 1],
         resourceGroupName: pieces[pieces.indexOf('resourcegroups') + 1],
         name: pieces[pieces.indexOf('managedclusters') + 1],
     };
+    this.currentClusterMetaInfo.next(managedClusterMetaInfo);
   }
 
-  // POST https://management.azure.com/${resourceUri}/listClusterAdminCredential?api-version=2023-07-01
-  getClientAdminCredentials(resourceId: string): Observable<CredentialResult> {
-    return this._armClient.postResourceWithoutEnvelope<CredentialResults, any>(`${resourceId}/${ManagedClusterCommandApi.LIST_CLUSTER_ADMIN_CREDENTIAL}`, true).pipe(
-      map((response: CredentialResults) => {
-        if (response.kubeconfigs && response.kubeconfigs.length > 0) {
-          if (response.kubeconfigs.length > 1) {
-            console.log(`received cluster credentials ${response.kubeconfigs.length}, use the first one only.`);
-          }
-          let userCredential: CredentialResult = {...response.kubeconfigs[0]};
-          userCredential.kubeconfig = yaml.parse(atob(userCredential.value)) as KubeConfigCredentials;
-          return userCredential;
-        }
-      }));
-  }
 
   //POST https://management.azure.com/${resourceUri}/runCommand?api-version=2023-07-01
   private runCommandInCluster(command: string, context: string): Observable<RunCommandResult> {
-      return this.privateManagedCluster.pipe(
+      return this.managedCluster.pipe(
         switchMap( (privateManagedCluter : PrivateManagedCluster) => {
           const commandRequest: RunCommandRequest = {
             command: command,
@@ -137,7 +149,7 @@ export class AdminManagedClustersService {
   // GET https://management.azure.com/${resourceUri}/commandResults/${commandId}?api-version=2023-07-01
   getRunCommandResult(commandId: string): Observable<RunCommandResult> {
     // TODO implement timeout
-    const privateManagedCluter : PrivateManagedCluster = this.privateManagedCluster.getValue();
+    const privateManagedCluter : PrivateManagedCluster = this.managedCluster.getValue();
     return timer(RUN_COMMAND_INITIAL_POLL_WAIT_MS, RUN_COMMAND_INTERVAL_MS).pipe(
       switchMap((retryAttempt: number) => {
           return this._armClient.getResourceFullResponse<RunCommandResult>(`${privateManagedCluter.resourceUri}/${ManagedClusterCommandApi.GET_COMMAND_RESULT}/${commandId}`, true);
@@ -215,7 +227,7 @@ export class AdminManagedClustersService {
     persicopeManifest.push(this.createPeriscopeConfigMap(periscopeConfig), this.createPeriscopeSecretMainfest(periscopeConfig));
     persicopeManifest.push(...this.createPeriscopeLinuxComponents(periscopeConfig)); 
      // TODO only when cluster has windows nodes
-    if (this.privateManagedCluster.getValue().windowsProfile) {
+    if (this.managedCluster.getValue().windowsProfile) {
       persicopeManifest.push(...this.createPeriscopeWindowsComponents(periscopeConfig)); 
     }  
     return this.zipStringToBase64(persicopeManifest.join(YAML_SEPARATOR), RunCommandContextConfig.PERISCOPE_MANIFEST);
@@ -241,11 +253,11 @@ export class AdminManagedClustersService {
       type: 'Opaque',
     };
     if (periscopeConfig.storage instanceof StorageAccountConfig) {
-      const storageConfig = (periscopeConfig.storage as StorageAccountConfig);
+      const storageConfig = periscopeConfig.storage;
       secretManifest.data = {
-        AZURE_BLOB_ACCOUNT_NAME: StringUtilities.convertStringToBase64(storageConfig.storageAccountName),
-        AZURE_BLOB_CONTAINER_NAME: StringUtilities.convertStringToBase64(storageConfig.storageAccountContainerName),
-        AZURE_BLOB_SAS_KEY: StringUtilities.convertStringToBase64(storageConfig.storageAccountSasToken),
+        AZURE_BLOB_ACCOUNT_NAME: StringUtilities.convertStringToBase64(storageConfig.resourceName),
+        AZURE_BLOB_CONTAINER_NAME: StringUtilities.convertStringToBase64(periscopeConfig.containerName),
+        AZURE_BLOB_SAS_KEY: StringUtilities.convertStringToBase64(storageConfig.sasToken),
       };
     } else {
       

@@ -9,8 +9,8 @@ import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/manage
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 import { environment } from 'projects/app-service-diagnostics/src/environments/environment';
 
-import { ManagedCluster, OwnedStorageAccountConfig, PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
-import { Observable, of } from 'rxjs';
+import {  PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
+import { BehaviorSubject, Observable, of } from 'rxjs';
 
 
 @Component({
@@ -20,13 +20,14 @@ import { Observable, of } from 'rxjs';
 })
 export class AksPeriscopeComponent implements OnInit {
 
-  // clusterToDiagnose: ManagedCluster = null;  
   periscopeConfig: PeriscopeConfig = new PeriscopeConfig();
-
-  // UI Stuff
   status: ToolStatus = ToolStatus.Loading;
   toolStatus = ToolStatus;
   statusMessage : string = null;
+
+  _clusterToDiagnose: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
+  storageConfig: StorageAccountConfig = null;
+
   diagnosticToolRunningStatus: string[] = [];
 
   validConfiguration: boolean = false;
@@ -34,32 +35,33 @@ export class AksPeriscopeComponent implements OnInit {
 
   constructor( 
     private _adminManagedCluster: AdminManagedClustersService) {
+      this._adminManagedCluster.currentCluster().subscribe((managedCluster: PrivateManagedCluster )=> {
+          this._clusterToDiagnose.next(managedCluster);
+    });
   }
   
-  ngOnInit(){
-    //update periscope config if storage account is re-configured;
+  ngOnInit() {
     this.setLoadingMessage("Loading cluster information...");
-    this._adminManagedCluster.currentCluster().subscribe((managedCluster: PrivateManagedCluster )=> {
-
-      this.setLoadingMessage("Loading storage account information...");
+    //update periscope config if storage account is re-configured;
+    this._clusterToDiagnose.subscribe((managedCluster: PrivateManagedCluster) => {
+      if (managedCluster === null) {
+        return;
+      }
+      this.setLoadingMessage("Cluster loaded...");
+      // TODO might toggle storage account later;
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
         this.setLoadingMessage("Cluster has diagnostic settings, use diagnostic settings ...");
-        this.periscopeConfig.storage = <OwnedStorageAccountConfig>{storageAccountName: managedCluster.diagnosticSettings[0].storageAccountId};
+        //TODO which one to use? get drop down from UI and ask user to choose.
+        this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
+          this.storageConfig = config;
+        });
       } else {
         this.setLoadingMessage("Cluster does not have diagnostic settings, choose a storage account...");
         this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
-          // TODO might toggle storage account later;
-          this.periscopeConfig.storage  = config;
+
+          this.storageConfig = config;
         });
       } 
-      // this.clusterToDiagnose = managedCluster; 
-      this.updatePeriscopeRunId();
-      // TODO fetch possible periscope releases, for now just use the latest;
-      this.periscopeConfig.linuxTag = '0.0.13';
-      this.periscopeConfig.windowsTag = '0.0.13';
-      this.diagnosticToolRunningStatus.push(`Current configuration successfully loaded.`);
-    
-      this.status = ToolStatus.Loaded;
     });
   }
 
@@ -69,7 +71,11 @@ export class AksPeriscopeComponent implements OnInit {
 
   //TODO replace this with the actual storage account info;
   getPeriscopeStorageAccount(): Observable<StorageAccountConfig> {
-    const pericopeConfig = new StorageAccountConfig(environment.storageAccountName, environment.blobContainerName, environment.sasUri);
+    const pericopeConfig =  <StorageAccountConfig> {
+      resourceName: environment.storageAccountName,
+      containerName:  environment.blobContainerName,
+      sasToken :environment.sasUri
+    };
     return of (pericopeConfig);
   }
 

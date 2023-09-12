@@ -1,3 +1,4 @@
+import { Observable } from "rxjs";
 import { OperatingSystem } from "./site";
 
 export class ManagedClusterMetaInfo  {
@@ -32,9 +33,10 @@ export class DiagnosticSettingsResource {
     properties: {
         storageAccountId: string
     };
-    name: string
+    name: string; 
+    location: string;
     logAnalyticsDestinationType: string;
-    storageAccountId: string;
+    storageAccountConfig: StorageAccountConfig;
 }
 // managed cluster with admin token
 export class PrivateManagedCluster extends ManagedCluster {
@@ -62,43 +64,24 @@ export class AgentPoolProfile {
 export class ServicePrincipalProfile {
     clientId: string;
 }
-
-export class OwnedStorageAccountConfig {
-    storageAccountName?: string;
-
-    constructor(storageAccountName?: string) {
-        this.storageAccountName = storageAccountName;   
-    }
-}
-
 // from https://learn.microsoft.com/en-us/rest/api/monitor/diagnostic-settings/list?tabs=HTTP#diagnosticsettingsresource
 
-export class StorageAccountConfig extends OwnedStorageAccountConfig {
-    storageAccountContainerName: string;
-    storageAccountSasToken: string;
-    storageAccountConnectionString?: string;   
-
-    constructor(storageAccountName?: string, storageAccountContainerName?: string, storageAccountSasToken?: string) {
-        super(storageAccountName);
-        this.storageAccountContainerName = storageAccountContainerName;
-        this.storageAccountSasToken = storageAccountSasToken;
+export class StorageAccountConfig  {
+    resourceUri?: string;
+    resourceName?: string;
+    sasToken: string;
+    connectionString?: string;   
+    
+    toString(): string {
+        return `StorageAccountConfig(storageAccountName=${this.resourceName}) - can connect? ${!!this.sasToken}`;
     }
 }
-
-
 
 export class PeriscopeConfig {
     diagnosticRunId?: string;
     linuxTag?: string;
     windowsTag?: string;
+    containerName: string;
     
-    storage: OwnedStorageAccountConfig;
-
-    storageAccountName(): string {
-        if (!this.storage) {
-            return "";
-        }
-        return  `${ this instanceof StorageAccountConfig ? (<StorageAccountConfig>this.storage).storageAccountContainerName : "Owned" } 
-                 ${this.storage.storageAccountName}`;
-    }
+    storage: StorageAccountConfig;
 }
