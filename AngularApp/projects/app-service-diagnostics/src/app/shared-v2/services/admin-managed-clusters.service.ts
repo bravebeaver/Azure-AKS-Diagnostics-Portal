@@ -101,10 +101,6 @@ export class AdminManagedClustersService {
        return <StorageAccountConfig>{sasToken: sasKey, resourceUri: resourceUri};
     }));
   };
-  
-  currentCluster(): Observable<PrivateManagedCluster> {
-    return this.managedCluster.pipe(filter(privateManagedCluter  =>  !!privateManagedCluter));
-  }
 
   private _populateManagedClusterMetaInfo(resourceId: string) {
     const pieces = resourceId.toLowerCase().split('/');

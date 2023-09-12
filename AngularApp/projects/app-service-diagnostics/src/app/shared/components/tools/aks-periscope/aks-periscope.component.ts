@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
 import { switchMap, tap } from 'rxjs/operators';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
@@ -20,53 +20,56 @@ import { BehaviorSubject, Observable, of } from 'rxjs';
 })
 export class AksPeriscopeComponent implements OnInit {
 
-  periscopeConfig: PeriscopeConfig = new PeriscopeConfig();
+  //UI stuff
   status: ToolStatus = ToolStatus.Loading;
   toolStatus = ToolStatus;
-  statusMessage : string = null;
 
-  _clusterToDiagnose: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
   storageConfig: StorageAccountConfig = null;
+  @Input() storageAccountName: string;
+  @Input() storageAccountSasKey: string;
+  @Input() containerName: string;
 
+
+  statusMessage : string[] = [ 'Loading...'];
   diagnosticToolRunningStatus: string[] = [];
-
-  validConfiguration: boolean = false;
   errorMessage: string;
 
-  constructor( 
-    private _adminManagedCluster: AdminManagedClustersService) {
-      this._adminManagedCluster.currentCluster().subscribe((managedCluster: PrivateManagedCluster )=> {
-          this._clusterToDiagnose.next(managedCluster);
-    });
+  _clusterToDiagnose$: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
+  
+  constructor(private _adminManagedCluster: AdminManagedClustersService) {
+
   }
   
   ngOnInit() {
     this.setLoadingMessage("Loading cluster information...");
-    //update periscope config if storage account is re-configured;
-    this._clusterToDiagnose.subscribe((managedCluster: PrivateManagedCluster) => {
+    this._adminManagedCluster.managedCluster.subscribe((managedCluster: PrivateManagedCluster )=> {
+
       if (managedCluster === null) {
         return;
       }
       this.setLoadingMessage("Cluster loaded...");
       // TODO might toggle storage account later;
+      this.containerName = managedCluster.name + '-periscope';
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
         this.setLoadingMessage("Cluster has diagnostic settings, use diagnostic settings ...");
         //TODO which one to use? get drop down from UI and ask user to choose.
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
-          this.storageConfig = config;
-        });
+           this.updateStorageAccount(config);
+          }
+        );
       } else {
         this.setLoadingMessage("Cluster does not have diagnostic settings, choose a storage account...");
         this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
-
-          this.storageConfig = config;
+          this.updateStorageAccount(config);
         });
       } 
     });
+    //update periscope config if storage account is re-configured;
   }
-
-  updatePeriscopeRunId() {
-   this.periscopeConfig.diagnosticRunId =  moment().format('YYYY-MM-DDTHH:mm:ss');;
+  updateStorageAccount(config: StorageAccountConfig) {
+    this.storageConfig = config;
+    this.storageAccountName = config.resourceName;
+    this.storageAccountSasKey = config.sasToken;
   }
 
   //TODO replace this with the actual storage account info;
@@ -79,13 +82,24 @@ export class AksPeriscopeComponent implements OnInit {
     return of (pericopeConfig);
   }
 
-  runInClusterPeriscope() {
-    this.setLoadingMessage(`Running periscope in cluster...`);
+  isValidStorageConfig(): boolean {
+    let validConfiguration = !!this.storageConfig && !!this.storageConfig.sasToken && !!this.storageConfig.resourceName;
+    console.log(`Current storage condfiguration ${JSON.stringify(this.storageConfig)} is valid? ${validConfiguration}`);
+    return validConfiguration;
+  }
 
-    this._adminManagedCluster.runCommandPeriscope(this.periscopeConfig).pipe(
-      tap( (submitCommandResult: RunCommandResult) => {
-        this.updatePeriscopeRunId();
-      }),
+  runInClusterPeriscope() {
+    if (this.isValidStorageConfig()) {
+      this.setErrorMessage("Invalid storage account");
+      return;
+    }
+    let periscopeConfig = <PeriscopeConfig>{
+      storage : this.storageConfig,
+      diagnosticRunId: moment().format('YYYY-MM-DDTHH:mm:ss')
+    };
+
+    this.status = ToolStatus.Running;
+    this._adminManagedCluster.runCommandPeriscope(periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
         this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
@@ -101,7 +115,7 @@ export class AksPeriscopeComponent implements OnInit {
   updateRunningStatus(messages: string[]|string) {
     this.status = ToolStatus.Loaded;
     this.errorMessage = null;
-    this.statusMessage = null;
+    this.statusMessage = [];
 
     if (typeof messages === 'string') {
       this.diagnosticToolRunningStatus.push( messages);
@@ -112,7 +126,7 @@ export class AksPeriscopeComponent implements OnInit {
 
   setLoadingMessage(message: string) {
     this.status = ToolStatus.Loading;
-    this.statusMessage = message;
+    this.statusMessage.push(message);
   }
 
   setErrorMessage(message: string) {
@@ -143,6 +157,7 @@ export class AksPeriscopeComponent implements OnInit {
 export enum ToolStatus {
   Loading,
   Loaded,
+  Running,
   Error
 }
 
