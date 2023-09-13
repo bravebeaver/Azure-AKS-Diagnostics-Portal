@@ -25,9 +25,7 @@ export class AksPeriscopeComponent implements OnInit {
   status: ToolStatus = ToolStatus.Loading;
   toolStatus = ToolStatus;
 
-  storageConfig: StorageAccountConfig = null;
-  @Input() storageAccountName: string;
-  @Input() storageAccountSasKey: string;
+  @Input() storageConfig: StorageAccountConfig = new StorageAccountConfig();
   @Input() containerName: string;
 
 
@@ -55,7 +53,8 @@ export class AksPeriscopeComponent implements OnInit {
         this.setLoadingMessage("Cluster has diagnostic settings, loading diagnostic settings ...");
         //TODO which one to use? get drop down from UI and ask user to choose.
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
-          this.updateStorageAccount(config);
+          this.storageConfig = config;
+          this.updateRunningStatus("Diagnostic settings loaded...");
         });
       } else {
         this.setLoadingMessage("Cluster does not have diagnostic settings, enter your own values for now...");
@@ -64,20 +63,11 @@ export class AksPeriscopeComponent implements OnInit {
         // });
       } 
     });
-    //update periscope config if storage account is re-configured;
-  }
-  updateStorageAccount(config: StorageAccountConfig) {
-    this.updateRunningStatus("Storage account updated...");
-    this.storageConfig = config;
-    const storageAccountDesc = ResourceDescriptor.parseResourceUri(config.resourceUri);
-    this.storageAccountName = storageAccountDesc.resource;
-    this.storageAccountSasKey = config.sasToken;
+
   }
 
   isValidStorageConfig(): boolean {
-    let validConfiguration = !!this.storageConfig && !!this.storageConfig.sasToken && !!this.storageConfig.resourceUri;
-    console.log(`Current storage condfiguration ${JSON.stringify(this.storageConfig)} is valid? ${validConfiguration}`);
-    return validConfiguration;
+    return !!this.storageConfig.sasToken && !!this.storageConfig.resourceName;
   }
 
   runInClusterPeriscope() {
@@ -87,7 +77,8 @@ export class AksPeriscopeComponent implements OnInit {
     }
     let periscopeConfig = <PeriscopeConfig>{
       storage : this.storageConfig,
-      diagnosticRunId: moment().format('YYYY-MM-DDTHH:mm:ss')
+      diagnosticRunId: moment().format('YYYY-MM-DDTHH:mm:ss'), 
+      containerName: this.containerName
     };
 
     this.status = ToolStatus.Running;
@@ -102,6 +93,7 @@ export class AksPeriscopeComponent implements OnInit {
     });
 
     //TODO poll storage account for results;
+    const periscopeLogContainerResourceUri = ``;
   }
   
   updateRunningStatus(messages: string[]|string) {

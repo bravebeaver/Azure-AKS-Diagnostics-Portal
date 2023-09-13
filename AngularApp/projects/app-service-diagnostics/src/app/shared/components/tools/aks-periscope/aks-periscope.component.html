@@ -48,9 +48,9 @@
                 <img src="assets/img/info.svg" title="storage-account"/>
               </fab-tooltip-host>
               <div class="col-sm-4">
-                <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageAccountName">
+                <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageConfig.resourceName">
                 <span style="color:red">*</span>
-                <div *ngIf="storageAccountName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+                <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
                   The storage account is required.
                 </div>
               </div>
@@ -65,7 +65,7 @@
               </fab-tooltip-host>
             </div>
             <div class="col-sm-4">
-              <input aria-required="false" placeholder="sas key" [(ngModel)]="storageAccountSasKey">
+              <input aria-required="false" placeholder="sas key" [(ngModel)]="storageConfig.sasToken">
             </div>
           </div>
           <div class="row">

@@ -7,7 +7,7 @@ import * as yaml from 'yaml';
 
 import {BehaviorSubject,  Observable,  combineLatest,  forkJoin,  from, identity, of, timer } from 'rxjs';
 import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap} from 'rxjs/operators';
-import { StringUtilities } from "diagnostic-data";
+import { ResourceDescriptor, StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
 
@@ -46,10 +46,13 @@ export class AdminManagedClustersService {
       })
     ).pipe(
       mergeMap(([managedCluster, adminCredential]: [ResponseMessageEnvelope<ManagedCluster>, CredentialResult]) => {
-        let currentCluster: PrivateManagedCluster = {... this.currentClusterMetaInfo, ... managedCluster.properties}
-        currentCluster.resourceUri = managedCluster.id;
         console.log(`found ${adminCredential.kubeconfig.users.length} users in admin credential. use the first one`)
-        currentCluster.adminToken = adminCredential.kubeconfig.users[0].user.token;
+        let currentCluster: PrivateManagedCluster = {
+          ... managedCluster.properties, 
+          name: managedCluster.name,
+          resourceUri: managedCluster.id, 
+          adminToken: adminCredential.kubeconfig.users[0].user.token
+        };
 
         // the cluster may or may not have diagnostics;
         return this.getResourceDiagnosticSettings(currentCluster.resourceUri).pipe(
@@ -98,7 +101,8 @@ export class AdminManagedClustersService {
     return this._storageService.generateSasKey(resourceUri, '').pipe(
       map((sasKey: string) => {
         console.log(`generating sas key. updating diagnostic settings ${resourceUri}`);
-       return <StorageAccountConfig>{sasToken: sasKey, resourceUri: resourceUri};
+        const storageAccountDesc = ResourceDescriptor.parseResourceUri(resourceUri);
+       return <StorageAccountConfig>{sasToken: sasKey, resourceUri: resourceUri, resourceName: storageAccountDesc.resource};
     }));
   };
 
