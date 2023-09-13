@@ -21,12 +21,7 @@
     </ul>
   </div>
 
-  <ng-template #runningStatus>
-    <ul>
-      <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
-    </ul>
-  </ng-template>
-  
+
   <div class="row" *ngIf=" errorMessage ">
     <div class="col-md-6 error-details">
       <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
@@ -61,9 +56,9 @@
               <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
                 [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
                 <img src="assets/img/info.svg" title="info" />
-                <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
               </fab-tooltip-host>
             </div>
+            <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
             <div class="col-sm-4">
               <input aria-required="false" placeholder="sas key" [(ngModel)]="storageConfig.sasToken">
             </div>
@@ -84,11 +79,29 @@
             </div>
           </div>   <!--TODO list existing periscope runs -->
         </div>
+        <div class="mt-3 ml-3">
+          <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() && status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
+            Run AKS periscope
+          </fab-primary-button>
+        </div>
       </collapsible-list-item>
     </collapsible-list-fabric>
-  <div class="mt-3 ml-3">
-    <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() && status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
-      Run AKS periscope
-    </fab-primary-button>
+    <collapsible-list-fabric [collapsed]="false" [title]="'Periscope Run Sessions'">
+      <collapsible-list-item body>
+        <div>
+          <ul>
+            <li *ngFor="let runConfig of periscopeSessions">
+              <fab-link (onClick)="openPeriscopeLogsBlade(runConfig)"> {{ runConfig.diagnosticRunId }} {{ runConfig.storage.resourceName }} - {{ runConfig.containerName }}  </fab-link>
+            </li>
+          </ul>
+        </div>
+      </collapsible-list-item>
+    </collapsible-list-fabric>
+    <ng-template #runningStatus>
+      <ul>
+        <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
+      </ul>
+    </ng-template>
+    
   </div>
 </div>

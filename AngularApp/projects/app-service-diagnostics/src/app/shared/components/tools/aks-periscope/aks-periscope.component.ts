@@ -6,12 +6,12 @@ import { BehaviorSubject} from 'rxjs';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 import * as moment from 'moment';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
-
+import { PortalService } from '../../../../startup/services/portal.service';
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 
 import {  PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
 
-import { ResourceDescriptor } from 'diagnostic-data';
+
 
 
 @Component({
@@ -31,11 +31,14 @@ export class AksPeriscopeComponent implements OnInit {
 
   statusMessage : string[] = [ 'Loading...'];
   diagnosticToolRunningStatus: string[] = [];
+  periscopeSessions: PeriscopeConfig[] = [];
   errorMessage: string;
 
   _clusterToDiagnose$: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
   
-  constructor(private _adminManagedCluster: AdminManagedClustersService) {
+  constructor(
+    private _adminManagedCluster: AdminManagedClustersService, 
+    private _portalService: PortalService) {
 
   }
   
@@ -71,7 +74,7 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   runInClusterPeriscope() {
-    if (this.isValidStorageConfig()) {
+    if (!this.isValidStorageConfig()) {
       this.setErrorMessage("Invalid storage account");
       return;
     }
@@ -81,7 +84,7 @@ export class AksPeriscopeComponent implements OnInit {
       containerName: this.containerName
     };
 
-    this.status = ToolStatus.Running;
+    this.clearRunningStatus();
     this._adminManagedCluster.runCommandPeriscope(periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
         this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
@@ -90,11 +93,29 @@ export class AksPeriscopeComponent implements OnInit {
     ).subscribe((runCommandResult: RunCommandResult) => {
       const commandResult = runCommandResult.properties.logs.split('\n');
       this.updateRunningStatus(commandResult);
-    });
-
-    //TODO poll storage account for results;
-    const periscopeLogContainerResourceUri = ``;
+      this.periscopeSessions.push(periscopeConfig);
+    }); 
   }
+
+  clearRunningStatus() {
+    this.status = ToolStatus.Running;
+    this.errorMessage = null;
+    this.statusMessage = [];
+
+    this.diagnosticToolRunningStatus = [];
+  }
+
+  public openPeriscopeLogsBlade() {
+    let bladeInfo = {
+        extension: 'HubsExtension',
+        detailBlade: 'BrowseResource',
+        detailBladeInputs: {
+            resourceType: "Microsoft.Storage"
+        }
+    };
+
+    this._portalService.openBlade(bladeInfo, 'troubleshoot');
+}
   
   updateRunningStatus(messages: string[]|string) {
     this.status = ToolStatus.Loaded;
