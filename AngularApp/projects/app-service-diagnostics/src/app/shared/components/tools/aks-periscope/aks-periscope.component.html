@@ -95,13 +95,14 @@
             </li>
           </ul>
         </div>
+        <ng-template #runningStatus>
+          <ul>
+            <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
+          </ul>
+        </ng-template>
       </collapsible-list-item>
     </collapsible-list-fabric>
-    <ng-template #runningStatus>
-      <ul>
-        <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
-      </ul>
-    </ng-template>
+
     
   </div>
 </div>
