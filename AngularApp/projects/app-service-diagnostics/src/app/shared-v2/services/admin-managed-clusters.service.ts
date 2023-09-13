@@ -163,10 +163,11 @@ export class AdminManagedClustersService {
   }
 
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-    return this.createPeriscopeContext(periscopeConfig).pipe(
-      switchMap((periscopeContext: string) => {
-        return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -f ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
-    }));    
+    return forkJoin([this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
+      this.createPeriscopeContext(periscopeConfig)]).pipe(
+        switchMap(([containerCreated, periscopeContext]: [boolean, string]) => {
+          return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -f ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
+      }));
   }
 
   runCommandKustomizePeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
