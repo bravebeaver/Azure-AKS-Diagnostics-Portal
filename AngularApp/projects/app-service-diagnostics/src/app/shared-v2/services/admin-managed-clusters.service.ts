@@ -46,7 +46,7 @@ export class AdminManagedClustersService {
       })
     ).pipe(
       mergeMap(([managedCluster, adminCredential]: [ResponseMessageEnvelope<ManagedCluster>, CredentialResult]) => {
-        let currentCluster: PrivateManagedCluster = managedCluster.properties;
+        let currentCluster: PrivateManagedCluster = {... this.currentClusterMetaInfo, ... managedCluster.properties}
         currentCluster.resourceUri = managedCluster.id;
         console.log(`found ${adminCredential.kubeconfig.users.length} users in admin credential. use the first one`)
         currentCluster.adminToken = adminCredential.kubeconfig.users[0].user.token;
@@ -112,7 +112,6 @@ export class AdminManagedClustersService {
     };
     this.currentClusterMetaInfo.next(managedClusterMetaInfo);
   }
-
 
   //POST https://management.azure.com/${resourceUri}/runCommand?api-version=2023-07-01
   private runCommandInCluster(command: string, context: string): Observable<RunCommandResult> {
@@ -202,7 +201,7 @@ export class AdminManagedClustersService {
       literals:
       - AZURE_BLOB_ACCOUNT_NAME=${storageConfig.storageAccountName}
       - AZURE_BLOB_CONTAINER_NAME=${storageConfig.containerName}
-      - AZURE_BLOB_SAS_KEY=${storageConfig.sasKey}
+      - AZURE_BLOB_SAS_KEY=?${storageConfig.sasKey}
     
     # Commented-out config values are the defaults. Uncomment to change.
     configMapGenerator:

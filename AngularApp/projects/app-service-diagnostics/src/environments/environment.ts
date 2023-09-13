@@ -9,10 +9,7 @@ export const environment = {
   backendHost: 'http://localhost:62302/',
   useApplensBackend: false,
   authServiceToken: "",
-  authServiceResourceId: "", 
-  storageAccountName: "",
-  blobContainerName: "",
-  sasUri: "",
+  authServiceResourceId: ""
 };
 
 /*

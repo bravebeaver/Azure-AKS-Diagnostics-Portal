@@ -1,16 +1,17 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
-import { switchMap, tap } from 'rxjs/operators';
+import { switchMap } from 'rxjs/operators';
+import { BehaviorSubject} from 'rxjs';
+
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 import * as moment from 'moment';
-
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
-import { environment } from 'projects/app-service-diagnostics/src/environments/environment';
 
 import {  PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
-import { BehaviorSubject, Observable, of } from 'rxjs';
+
+import { ResourceDescriptor } from 'diagnostic-data';
 
 
 @Component({
@@ -47,43 +48,34 @@ export class AksPeriscopeComponent implements OnInit {
       if (managedCluster === null) {
         return;
       }
-      this.setLoadingMessage("Cluster loaded...");
+      this.updateRunningStatus("Cluster loaded...");
       // TODO might toggle storage account later;
       this.containerName = managedCluster.name + '-periscope';
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
-        this.setLoadingMessage("Cluster has diagnostic settings, use diagnostic settings ...");
+        this.setLoadingMessage("Cluster has diagnostic settings, loading diagnostic settings ...");
         //TODO which one to use? get drop down from UI and ask user to choose.
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
-           this.updateStorageAccount(config);
-          }
-        );
-      } else {
-        this.setLoadingMessage("Cluster does not have diagnostic settings, choose a storage account...");
-        this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
           this.updateStorageAccount(config);
         });
+      } else {
+        this.setLoadingMessage("Cluster does not have diagnostic settings, enter your own values for now...");
+        // this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
+        //   this.updateStorageAccount(config);
+        // });
       } 
     });
     //update periscope config if storage account is re-configured;
   }
   updateStorageAccount(config: StorageAccountConfig) {
+    this.updateRunningStatus("Storage account updated...");
     this.storageConfig = config;
-    this.storageAccountName = config.resourceName;
+    const storageAccountDesc = ResourceDescriptor.parseResourceUri(config.resourceUri);
+    this.storageAccountName = storageAccountDesc.resource;
     this.storageAccountSasKey = config.sasToken;
   }
 
-  //TODO replace this with the actual storage account info;
-  getPeriscopeStorageAccount(): Observable<StorageAccountConfig> {
-    const pericopeConfig =  <StorageAccountConfig> {
-      resourceName: environment.storageAccountName,
-      containerName:  environment.blobContainerName,
-      sasToken :environment.sasUri
-    };
-    return of (pericopeConfig);
-  }
-
   isValidStorageConfig(): boolean {
-    let validConfiguration = !!this.storageConfig && !!this.storageConfig.sasToken && !!this.storageConfig.resourceName;
+    let validConfiguration = !!this.storageConfig && !!this.storageConfig.sasToken && !!this.storageConfig.resourceUri;
     console.log(`Current storage condfiguration ${JSON.stringify(this.storageConfig)} is valid? ${validConfiguration}`);
     return validConfiguration;
   }

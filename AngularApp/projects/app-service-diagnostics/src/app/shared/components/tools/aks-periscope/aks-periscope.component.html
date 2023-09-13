@@ -14,7 +14,6 @@
       </li>
   </ul>
 
-
   <div *ngIf="status == toolStatus.Loading; else runningStatus">
     <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
     <ul>
@@ -22,107 +21,74 @@
     </ul>
   </div>
 
-
-
   <ng-template #runningStatus>
     <ul>
       <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
     </ul>
   </ng-template>
+  
+  <div class="row" *ngIf=" errorMessage ">
+    <div class="col-md-6 error-details">
+      <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
+      <span *ngIf="errorMessage">{{ errorMessage }}</span> &nbsp;<span *ngIf="error">{{ error }}</span>
+    </div>
+  </div>
 
   <div style="margin-top: 40px;">
     <collapsible-list-fabric [title]="'Configure'">
-
       <!--configure periscope run-->
       <collapsible-list-item body>
         <div class="container">
-          <div>
-            <div class="row mt-4">
- 
-              <div class="col-md-3 field-label"> Storage account Name <span class="required">*</span>
-                <fab-tooltip-host
-                  content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
-                  or an account with a shared access signature token"
-                  [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                  <img src="assets/img/info.svg" title="storage-account"/>
-                </fab-tooltip-host>
-                <div class="col-sm-4">
-                  <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageAccountName">
-                  <span style="color:red">*</span>
-                  <div *ngIf="storageAccountName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-                    Private should be > 102400 KB (100 MB) to 33554432 KB (32 GB)
-                  </div>
+          <div class="row">
+            <div class="col-md-3 field-label"> Storage account Name <span class="required">*</span>
+              <fab-tooltip-host
+                content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
+                or an account with a shared access signature token"
+                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                <img src="assets/img/info.svg" title="storage-account"/>
+              </fab-tooltip-host>
+              <div class="col-sm-4">
+                <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageAccountName">
+                <span style="color:red">*</span>
+                <div *ngIf="storageAccountName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+                  The storage account is required.
                 </div>
               </div>
-              <div class="row">
-                <div class="col-md-3 field-label"> Storage Account SAS Key<span class="required">*</span>
-                  <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
-                    [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                    <img src="assets/img/info.svg" title="info" />
-                      <pre>
-                        <code class="language-bash">
-                        export storageAccountName='xx'
-                        export subscriptionId='xx'
-                        sas_expiry=`date -u -d "30 minutes" '+%Y-%m-%dT%H:%MZ'`
-                        sas=$(az storage account generate-sas \
-                            --account-name $storageAccountName \
-                            --subscription $subscriptionId \
-                            --permissions rlacw \
-                            --services b \
-                            --resource-types sco \
-                            --expiry $sas_expiry \
-                            -o tsv)
-                        </code>
-                      </pre>
-
-                  </fab-tooltip-host>
-                </div>
-                <div class="col-sm-4">
-                  <input aria-required="false" placeholder="sas key" [(ngModel)]="storageAccountSasKey">
-                </div>
-              </div>
-              <div class="row">
-                <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
-                  <fab-tooltip-host content="The blob container to store the logs of Periscope."
-                    [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                    <img src="assets/img/info.svg" title="info" />
-                  </fab-tooltip-host>
-                </div>
-                <div class="col-sm-4">
-                  <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
-                  <span style="color:red">*</span>
-                  <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-                    The container will be created if not exist already.
-                  </div>
-                </div>
-              </div>
-   
-              <!-- <div class="col-md-2">
-                <span> {{ storageAccountName }} </span>
-                <div class="mt-1 mb-4" (click)="toggleStorageAccountPanel()" (keyup.enter)="toggleStorageAccountPanel()">
-                  <a tabindex="0" role="button" name="Change storage account" aria-label="Change storage account">
-                    {{ storageAccountName != null && storageAccountName.length > 0  ? 'Change' : 'Select' }}</a>
-                </div>
-              </div> -->
             </div>
           </div>
-
-          <div class="row" *ngIf=" errorMessage ">
-            <div class="col-md-6 error-details">
-              <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
-              <span *ngIf="errorMessage">{{ errorMessage }}</span> &nbsp;<span *ngIf="error">{{ error}}</span>
+          <div class="row">
+            <div class="col-md-3 field-label"> Storage Account SAS Key<span class="required">*</span>
+              <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
+                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                <img src="assets/img/info.svg" title="info" />
+                <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
+              </fab-tooltip-host>
+            </div>
+            <div class="col-sm-4">
+              <input aria-required="false" placeholder="sas key" [(ngModel)]="storageAccountSasKey">
             </div>
           </div>
-
-          <div class="mt-3 ml-3">
-            <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() && status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
-              Run AKS periscope
-            </fab-primary-button>
-          </div>
-                <!--TODO list existing periscope runs -->
+          <div class="row">
+            <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
+              <fab-tooltip-host content="The blob container to store the logs of Periscope."
+                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                <img src="assets/img/info.svg" title="info" />
+              </fab-tooltip-host>
+            </div>
+            <div class="col-sm-4">
+              <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
+              <span style="color:red">*</span>
+              <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+                The container will be created if not exist already.
+              </div>
+            </div>
+          </div>   <!--TODO list existing periscope runs -->
         </div>
       </collapsible-list-item>
-
     </collapsible-list-fabric>
+  <div class="mt-3 ml-3">
+    <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() && status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
+      Run AKS periscope
+    </fab-primary-button>
   </div>
 </div>
