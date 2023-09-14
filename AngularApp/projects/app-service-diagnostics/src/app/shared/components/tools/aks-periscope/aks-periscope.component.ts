@@ -26,14 +26,18 @@ export class AksPeriscopeComponent implements OnInit {
 
   @Input() storageConfig: StorageAccountConfig = new StorageAccountConfig();
   @Input() containerName: string;
+  @Input() windowsTag: string = "0.0.13";
+  @Input() linuxTag: string = "0.0.13";
+  
+  collapse = [{ title: 'Config New Session', collapsed: false },
+              { title: 'Running Status', collapsed: true },
+              { title: 'Historical Sessions', collapsed: true }];
 
+  loadingMessage : string = 'Loading...';
+  toolRunningMessages: string[] = [];
+  errorMessage: string = null;
 
-  collapse = [{ title: 'Analyze', collapsed: false },
-              { title: 'View History', collapsed: true }];
-  statusMessage : string[] = [ 'Loading...'];
-  diagnosticToolRunningStatus: string[] = [];
   periscopeSessions: PeriscopeConfig[] = [];
-  errorMessage: string;
   _clusterToDiagnose$: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
   
   constructor(
@@ -43,37 +47,41 @@ export class AksPeriscopeComponent implements OnInit {
   }
   
   ngOnInit() {
-    this.setLoadingMessage("Loading cluster information...");
     this._adminManagedCluster.managedCluster.subscribe((managedCluster: ManagedCluster )=> {
 
       if (managedCluster === null) {
+        this.setErrorMessage("No cluster selected");
         return;
       }
-      this.updateRunningStatus("Cluster loaded...");
-      // TODO might toggle storage account later;
+      this.loaded();
       this.containerName = managedCluster.name + '-periscope';
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
-        this.setLoadingMessage("Cluster has diagnostic settings, loading diagnostic settings ...");
         //TODO which one to use? get drop down from UI and ask user to choose.
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
           this.storageConfig = config;
-          this.updateRunningStatus("Diagnostic settings loaded...");
           this.retrievePeriscopeSessions();
         });
       } else {
-        this.setLoadingMessage("Cluster does not have diagnostic settings, enter your own values for now...");
+
         // this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
         //   this.updateStorageAccount(config);
         // });
       } 
+        // TODO might toggle storage account later;
     });
-
   }
+
+  loaded() {
+  this.updateMessages(null, ToolStatus.Loaded);
+  }
+
   retrievePeriscopeSessions() {
+    //TODO read from storage account and the blob container name
     this.periscopeSessions = [];
   }
 
   isValidStorageConfig(): boolean {
+    //TODO validate storage account sas token?
     return !!this.storageConfig.accountSasToken && !!this.storageConfig.resourceName;
   }
 
@@ -82,61 +90,85 @@ export class AksPeriscopeComponent implements OnInit {
       this.setErrorMessage("Invalid storage account");
       return;
     }
+
     let periscopeConfig = <PeriscopeConfig>{
       storage : this.storageConfig,
       diagnosticRunId: moment().format('YYYY-MM-DDTHH:mm:ss'), 
-      containerName: this.containerName
+      containerName: this.containerName,
+      linuxTag: this.linuxTag,
+      windowsTag: this.windowsTag
     };
 
-    this.clearRunningStatus();
+    this.prepareNewSession();
     
     this._adminManagedCluster.runCommandPeriscope(periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
-        this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
+        this.updateRunningStatus([`Command submitted with ID - ${submitCommandResult.id}`, `Please wait for result...`]);
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
     ).subscribe((runCommandResult: RunCommandResult) => {
-      const commandResult = runCommandResult.properties.logs.split('\n');
-      this.updateRunningStatus(commandResult);
-      this.collapse[1].collapsed = false;
-      this.periscopeSessions.push(periscopeConfig);
+        this.periscopeSessions.push(periscopeConfig);
+        const commandResult = runCommandResult.properties.logs.split('\n');
+        this.updateRunningStatus(commandResult);
+        this.updateRunningStatus([`Retrieving periscope running logs...`]);
+        this._adminManagedCluster.pollPeriscopeResult().subscribe((periscopeLogs: string[]) => {
+          this.completeRunningStatus(periscopeLogs);
+        });
     }); 
   }
 
-  clearRunningStatus() {
-    this.status = ToolStatus.Running;
+  prepareNewSession() {
     this.errorMessage = null;
-    this.statusMessage = [];
+    this.toolRunningMessages = [];
 
-    this.diagnosticToolRunningStatus = [];
+    this.collapse[1].collapsed = false;
+
+    this.status = ToolStatus.Running;
   }
 
   viewLogs(config: PeriscopeConfig) {
     this.telemetryService.logEvent("OpenPeriscopeLogPanel");
     this.telemetryService.logPageView("PeriscopeLogPanelView");
-    this._portalActionService.openStorageBladeForCluster(config);
+    this._portalActionService.openStorageBlade(config);
   }
 
-  updateRunningStatus(messages: string[]|string) {
-    this.status = ToolStatus.Loaded;
-    this.errorMessage = null;
-    this.statusMessage = [];
-
-    if (typeof messages === 'string') {
-      this.diagnosticToolRunningStatus.push( messages);
-    } else {
-      this.diagnosticToolRunningStatus.push( ...messages);
+  updateMessages(messages: string|string[], status: ToolStatus) {
+    this.status = status;
+    switch (status) {
+      case ToolStatus.Loading:
+        this.loadingMessage = messages as string;
+        this.errorMessage = null;
+        break;
+      case ToolStatus.PollingResult:
+        this.toolRunningMessages.push(...(messages as string[]));
+        break;
+      case ToolStatus.Submitted:
+        this.toolRunningMessages.push(...(messages as string[]));
+        break;
+      case ToolStatus.Error:
+        this.errorMessage = messages as string;
+        break;
+      case ToolStatus.Loaded:
+        this.errorMessage = null;
+        this.loadingMessage = null;
     }
   }
 
-  setLoadingMessage(message: string) {
-    this.status = ToolStatus.Loading;
-    this.statusMessage.push(message);
+  updateLoadingMessage(message: string) {
+    this.updateMessages(message, ToolStatus.Loading);
+  }
+
+  updateRunningStatus(messages: string[]) {
+    this.updateMessages(messages, ToolStatus.PollingResult);
+  }
+
+  completeRunningStatus(messages: string[]) {
+    this.updateMessages(messages, ToolStatus.Submitted);
+    this.collapse[2].collapsed = false;
   }
 
   setErrorMessage(message: string) {
-    this.errorMessage = message;
-    this.status = ToolStatus.Error;
+    this.updateMessages([message], ToolStatus.Error);
   }
 
   // For tooltip display
@@ -163,6 +195,8 @@ export enum ToolStatus {
   Loading,
   Loaded,
   Running,
+  PollingResult,
+  Submitted,
   Error
 }
 

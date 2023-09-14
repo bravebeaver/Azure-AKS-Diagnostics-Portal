@@ -51,7 +51,7 @@ export class PortalActionService {
         this._portalService.openBlade(bladeInfo, 'troubleshoot');
     }
 
-    public openStorageBladeForCluster(periscopeRunConfig: PeriscopeConfig) {
+    public openStorageBlade(periscopeRunConfig: PeriscopeConfig) {
         const bladeInfo = {
             detailBlade: 'BlobsBlade',
             extension: 'Microsoft_Azure_Storage',

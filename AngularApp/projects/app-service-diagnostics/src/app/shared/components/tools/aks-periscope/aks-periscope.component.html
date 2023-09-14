@@ -7,24 +7,30 @@
     <a target="_blank" rel="noopener" href="https://github.com/Azure/aks-periscope">Learn more</a>
   </p>
 
-  <h3>What you should know before using runCommand </h3>
-  <ul>
-      <li>The runCommand is only available for AKS clusters with Azure AD enabled.
-        <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
-      </li>
-  </ul>
+  <p class="category-description">
+    The diagnostic tool uses <code>runCommand</code> which is only available for AKS clusters with Azure AD enabled.
+    <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
+  </p>
+
+  <p class="category-description">
+    Periscope requires a storage account to store the logs. If you do not own the storage account, you can specify a SAS token. The SAS token for your storage account using the Azure portal or Azure CLI.
+    <span style="margin-top:5px"><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a></span>
+  </p>
+  
+  <p class="category-description">
+    Read our data privacy statement here.
+    <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
+  </p>
 
   <div *ngIf="status == toolStatus.Loading">
     <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
-    <ul>
-      <li *ngFor="let statusUpdate of statusMessage">{{ statusUpdate }}</li>
-    </ul>
+    <span>{{ loadingMessage }}</span>
   </div>
 
-  <div class="row" *ngIf=" errorMessage ">
+  <div class="row" *ngIf=" errorMessage">
     <div class="col-md-6 error-details">
       <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
-      <span *ngIf="errorMessage">{{ errorMessage }}</span> &nbsp;<span *ngIf="error">{{ error }}</span>
+      <span>{{ errorMessage }}</span>
     </div>
   </div>
 
@@ -47,20 +53,18 @@
                 The storage account is required.
               </div>
             </div>
+
           </div>
         </div>
         <div class="row">
-          <div class="col-md-3 field-label"> Storage Account SAS Key<span class="required">*</span>
+          <div class="col-md-3 field-label"> Storage Account SAS Key
             <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
               [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
               <img src="assets/img/info.svg" title="info" />
             </fab-tooltip-host>
           </div>
           <div class="col-sm-4">
-            <input aria-required="false" placeholder="sas key" [(ngModel)]="storageConfig.accountSasToken">
-          </div>
-          <div class="col-sm-4">
-            <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
+            <input aria-required="false" placeholder="sas token" [(ngModel)]="storageConfig.accountSasToken">
           </div>
         </div>
         <div class="row">
@@ -84,27 +88,41 @@
           Run AKS periscope
         </fab-primary-button>
       </div>
-      <ng-template #runningStatus>
-        <ul>
-          <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
-        </ul>
-      </ng-template>
     </collapsible-list-item>
   </collapsible-list-fabric>
 
   <collapsible-list-fabric [collapsed]="collapse[1].collapsed" [title]="collapse[1].title">
     <collapsible-list-item body>
       <div class="container">
+        <div class="col-md-9">
+          <div *ngIf="toolRunningMessages.length > 0">
+            <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
+            Waiting for logs...
+          </div>
+          <ul>
+            <li *ngFor="let runningMessage of toolRunningMessages">{{ runningMessage }}</li>
+          </ul> 
+        </div>
+      </div>
+    </collapsible-list-item>
+  </collapsible-list-fabric>
+
+  <collapsible-list-fabric [collapsed]="collapse[2].collapsed" [title]="collapse[2].title">
+    <collapsible-list-item body>
+      <div class="container">
         <div class="row">
           <div class="col-md-9">
-            <div *ngIf="periscopeSessions.length === 0">
-              No running session is availble.
+            <div *ngIf="periscopeSessions.length === 0 else toolSessions">
+              <fab-tooltip-host content="Only sessions available to AKS are displayed here" [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                No historical session is availble.
+              </fab-tooltip-host>
             </div>
-            <div *ngIf="periscopeSessions.length > 0">
+
+            <ng-template #toolSessions>
               <table class="table table-borderless">
                 <thead>
                   <tr>
-                    <th tabindex="0" style="height: 50px;">Runtime</th>
+                    <th tabindex="0" style="height: 50px;">Runtime/ Diagnostic Id</th>
                     <th tabindex="0">Logs</th>
                     <th tabindex="0">Analytics</th>
                   </tr>
@@ -126,11 +144,12 @@
                   </tr>
                 </tbody>
               </table>
-
-            </div>
+            </ng-template>
           </div>
         </div>
       </div>
     </collapsible-list-item>
   </collapsible-list-fabric>
+
 </div>
+

@@ -6,7 +6,7 @@ import * as yaml from 'yaml';
 
 
 import {BehaviorSubject,  Observable,  combineLatest,  forkJoin,  from, identity, of, timer } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap} from 'rxjs/operators';
+import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap, repeatWhen, delay, scan} from 'rxjs/operators';
 import { ResourceDescriptor, StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
@@ -17,9 +17,11 @@ import { AuthService } from '../../startup/services/auth.service';
 import { ResourceType, StartupInfo } from '../../shared/models/portal';
 import { ResponseMessageCollectionEnvelope, ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
 import { StorageService } from '../../shared/services/storage.service';
+import { join } from 'path';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
-const RUN_COMMAND_INTERVAL_MS: number = 5000;
+const RUN_COMMAND_INTERVAL_MS: number = 2000;
+const POLL_LOG_INITIAL_DELAY_MS: number = 5000;
 const YAML_SEPARATOR: string = "---\n";
 @Injectable()
 export class AdminManagedClustersService {
@@ -114,14 +116,15 @@ export class AdminManagedClustersService {
     this.currentClusterMetaInfo.next(managedClusterMetaInfo);
   }
 
+
   //POST https://management.azure.com/${resourceUri}/runCommand?api-version=2023-07-01
-  private runCommandInCluster(command: string, context: string): Observable<RunCommandResult> {
+  private runCommandInCluster(command: string, context?: string): Observable<RunCommandResult> {
       return this.managedCluster.pipe(
         switchMap( (privateManagedCluter : ManagedCluster) => {
           const commandRequest: RunCommandRequest = {
             command: command,
             clusterToken: privateManagedCluter.adminToken,
-            context: context
+            context: context || ""
           };
 
         return this._armClient.postResourceFullResponse<RunCommandResult>(
@@ -148,17 +151,17 @@ export class AdminManagedClustersService {
     const privateManagedCluter : ManagedCluster = this.managedCluster.getValue();
     return timer(RUN_COMMAND_INITIAL_POLL_WAIT_MS, RUN_COMMAND_INTERVAL_MS).pipe(
       switchMap((retryAttempt: number) => {
-          return this._armClient.getResourceFullResponse<RunCommandResult>(`${privateManagedCluter.resourceUri}/${ManagedClusterCommandApi.GET_COMMAND_RESULT}/${commandId}`, true);
+        console.log(`polling result of runCommand for the ${retryAttempt} times ...`)
+        return this._armClient.getResourceFullResponse<RunCommandResult>(`${privateManagedCluter.resourceUri}/${ManagedClusterCommandApi.GET_COMMAND_RESULT}/${commandId}`, true);
       }),
       takeWhile(runCommandResult => {
           // Keep polling until the status is not 202
           return runCommandResult.status == 202;
       }, true),
-      takeLast(1))
-    .pipe(
+      takeLast(1)
+    ).pipe(
       map((runCommandResult: HttpResponse<RunCommandResult>) => runCommandResult.body));  
   }
-
 
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
     return forkJoin([this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
@@ -168,52 +171,32 @@ export class AdminManagedClustersService {
       }));
   }
 
-  runCommandKustomizePeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-    return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -k ${RunCommandContextConfig.PERISCOPE_KUSTOMIZE_MANIFEST}`, 
-    this.createPeriscopeContextUsingKustomize(periscopeConfig));
+  pollPeriscopeResult(): Observable<String[]> {
+    return of(null).pipe(
+      delay(POLL_LOG_INITIAL_DELAY_MS),
+      switchMap(() => {
+        return this.getPeriscopeLogs();  
+      }), 
+      repeatWhen((completed) => completed.pipe(
+        takeWhile((logs: string[]) => {
+          return !logs || logs[logs.length-1].indexOf("Completed Periscope run") < 0;
+        }, true)
+      )), 
+      scan((acc, curr) => [ ...acc, curr], [])
+    ); 
   }
-
-  createOverlayDir(fileContent: string): Observable<string> {
-    return of("");
-  }
-
-  createPeriscopeContextUsingKustomize(periscopeConfig: PeriscopeConfig): string {
-    const imageTag = "0.0.13";
-
-    const storageConfig = {
-      storageAccountName: process.env.STORAGE_ACCOUNT_NAME,
-      containerName: process.env.BLOB_CONTAINER_NAME,
-      sasKey: process.env.SAS_KEY,
-    };
-
-    const kustomizeConfig = `
-    resources:
-    - https://github.com/azure/aks-periscope//deployment/base?ref=<RELEASE_TAG>
-    
-    images:
-    - name: periscope-linux
-      newName: mcr.microsoft.com/aks/periscope
-      newTag: ${imageTag}
-    - name: periscope-windows
-      newName: mcr.microsoft.com/aks/periscope
-      newTag: ${imageTag}
-    
-    secretGenerator:
-    - name: azureblob-secret
-      behavior: replace
-      literals:
-      - AZURE_BLOB_ACCOUNT_NAME=${storageConfig.storageAccountName}
-      - AZURE_BLOB_CONTAINER_NAME=${storageConfig.containerName}
-      - AZURE_BLOB_SAS_KEY=?${storageConfig.sasKey}
-    
-    # Commented-out config values are the defaults. Uncomment to change.
-    configMapGenerator:
-    - name: diagnostic-config
-      behavior: merge
-      literals:
-      - DIAGNOSTIC_RUN_ID=${periscopeConfig.diagnosticRunId}   
-    `;
-    return kustomizeConfig;
+  
+  getPeriscopeLogs(): Observable<string[]> {
+    console.log("get periscope logs from cluster");
+    return this.runCommandInCluster(`${InClusterDiagnosticCommands.GET_PERISCOPE_LOGS}`).pipe(
+      switchMap((submitCommandResult: RunCommandResult) => {
+        return this.getRunCommandResult(submitCommandResult.id)
+      })
+    ).pipe(
+      map((runCommandResult: RunCommandResult) => {
+        return runCommandResult.properties.logs.split('\n');
+      })
+    );
   }
 
   // TODO this is rather silly, find another way to interact with kustomize
@@ -250,16 +233,13 @@ export class AdminManagedClustersService {
       },
       type: 'Opaque',
     };
-    if (periscopeConfig.storage instanceof StorageAccountConfig) {
-      const storageConfig = periscopeConfig.storage;
-      secretManifest.data = {
-        AZURE_BLOB_ACCOUNT_NAME: StringUtilities.convertStringToBase64(storageConfig.resourceName),
-        AZURE_BLOB_CONTAINER_NAME: StringUtilities.convertStringToBase64(periscopeConfig.containerName),
-        AZURE_BLOB_SAS_KEY: StringUtilities.convertStringToBase64(storageConfig.accountSasToken),
-      };
-    } else {
-      
-    }
+
+    const storageConfig = periscopeConfig.storage;
+    secretManifest.data = {
+      AZURE_BLOB_ACCOUNT_NAME: StringUtilities.convertStringToBase64(storageConfig.resourceName),
+      AZURE_BLOB_CONTAINER_NAME: StringUtilities.convertStringToBase64(periscopeConfig.containerName),
+      AZURE_BLOB_SAS_KEY: StringUtilities.convertStringToBase64('?' + storageConfig.accountSasToken),
+    };
     return  yaml.stringify(secretManifest);
   }
 
@@ -487,6 +467,7 @@ export enum InClusterDiagnosticCommands {
   GET_CLUSTER_INFO = "kubectl cluster-info",
   GET_NODE = "kubectl get nodes",
   APPLY = "kubectl apply",
+  GET_PERISCOPE_LOGS = "kubectl logs -n aks-periscope -l app=aks-periscope",
 }
 
 export enum RunCommandContextConfig {
