@@ -6,13 +6,12 @@ import { BehaviorSubject} from 'rxjs';
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 import * as moment from 'moment';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
-import { PortalService } from '../../../../startup/services/portal.service';
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 
-import {  PeriscopeConfig, PrivateManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
-
-
-
+import {  PeriscopeConfig, ManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
+import { TelemetryService } from 'diagnostic-data';
+import { Globals } from 'projects/app-service-diagnostics/src/app/globals';
+import { PortalActionService } from '../../../services/portal-action.service';
 
 @Component({
   selector: 'aks-periscope',
@@ -29,22 +28,23 @@ export class AksPeriscopeComponent implements OnInit {
   @Input() containerName: string;
 
 
+  collapse = [{ title: 'Analyze', collapsed: false },
+              { title: 'View History', collapsed: true }];
   statusMessage : string[] = [ 'Loading...'];
   diagnosticToolRunningStatus: string[] = [];
   periscopeSessions: PeriscopeConfig[] = [];
   errorMessage: string;
-
-  _clusterToDiagnose$: BehaviorSubject<PrivateManagedCluster> = new BehaviorSubject<PrivateManagedCluster>(null);
+  _clusterToDiagnose$: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
   
   constructor(
     private _adminManagedCluster: AdminManagedClustersService, 
-    private _portalService: PortalService) {
-
+    private _portalActionService: PortalActionService, 
+    private telemetryService: TelemetryService) {
   }
   
   ngOnInit() {
     this.setLoadingMessage("Loading cluster information...");
-    this._adminManagedCluster.managedCluster.subscribe((managedCluster: PrivateManagedCluster )=> {
+    this._adminManagedCluster.managedCluster.subscribe((managedCluster: ManagedCluster )=> {
 
       if (managedCluster === null) {
         return;
@@ -58,6 +58,7 @@ export class AksPeriscopeComponent implements OnInit {
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
           this.storageConfig = config;
           this.updateRunningStatus("Diagnostic settings loaded...");
+          this.retrievePeriscopeSessions();
         });
       } else {
         this.setLoadingMessage("Cluster does not have diagnostic settings, enter your own values for now...");
@@ -68,9 +69,12 @@ export class AksPeriscopeComponent implements OnInit {
     });
 
   }
+  retrievePeriscopeSessions() {
+    this.periscopeSessions = [];
+  }
 
   isValidStorageConfig(): boolean {
-    return !!this.storageConfig.sasToken && !!this.storageConfig.resourceName;
+    return !!this.storageConfig.accountSasToken && !!this.storageConfig.resourceName;
   }
 
   runInClusterPeriscope() {
@@ -85,6 +89,7 @@ export class AksPeriscopeComponent implements OnInit {
     };
 
     this.clearRunningStatus();
+    
     this._adminManagedCluster.runCommandPeriscope(periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
         this.updateRunningStatus(`Command submitted with ID - ${submitCommandResult.id}, checking results...`);
@@ -93,6 +98,7 @@ export class AksPeriscopeComponent implements OnInit {
     ).subscribe((runCommandResult: RunCommandResult) => {
       const commandResult = runCommandResult.properties.logs.split('\n');
       this.updateRunningStatus(commandResult);
+      this.collapse[1].collapsed = false;
       this.periscopeSessions.push(periscopeConfig);
     }); 
   }
@@ -105,18 +111,12 @@ export class AksPeriscopeComponent implements OnInit {
     this.diagnosticToolRunningStatus = [];
   }
 
-  public openPeriscopeLogsBlade() {
-    let bladeInfo = {
-        extension: 'HubsExtension',
-        detailBlade: 'BrowseResource',
-        detailBladeInputs: {
-            resourceType: "Microsoft.Storage"
-        }
-    };
+  viewLogs(config: PeriscopeConfig) {
+    this.telemetryService.logEvent("OpenPeriscopeLogPanel");
+    this.telemetryService.logPageView("PeriscopeLogPanelView");
+    this._portalActionService.openStorageBladeForCluster(config);
+  }
 
-    this._portalService.openBlade(bladeInfo, 'troubleshoot');
-}
-  
   updateRunningStatus(messages: string[]|string) {
     this.status = ToolStatus.Loaded;
     this.errorMessage = null;

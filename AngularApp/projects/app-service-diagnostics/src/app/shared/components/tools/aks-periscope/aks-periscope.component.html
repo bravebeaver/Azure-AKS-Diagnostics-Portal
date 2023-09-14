@@ -14,13 +14,12 @@
       </li>
   </ul>
 
-  <div *ngIf="status == toolStatus.Loading; else runningStatus">
+  <div *ngIf="status == toolStatus.Loading">
     <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
     <ul>
       <li *ngFor="let statusUpdate of statusMessage">{{ statusUpdate }}</li>
     </ul>
   </div>
-
 
   <div class="row" *ngIf=" errorMessage ">
     <div class="col-md-6 error-details">
@@ -29,80 +28,109 @@
     </div>
   </div>
 
-  <div style="margin-top: 40px;">
-    <collapsible-list-fabric [title]="'Configure'">
-      <!--configure periscope run-->
-      <collapsible-list-item body>
-        <div class="container">
-          <div class="row">
-            <div class="col-md-3 field-label"> Storage account Name <span class="required">*</span>
-              <fab-tooltip-host
-                content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
-                or an account with a shared access signature token"
-                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                <img src="assets/img/info.svg" title="storage-account"/>
-              </fab-tooltip-host>
-              <div class="col-sm-4">
-                <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageConfig.resourceName">
-                <span style="color:red">*</span>
-                <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-                  The storage account is required.
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-3 field-label"> Storage Account SAS Key<span class="required">*</span>
-              <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
-                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                <img src="assets/img/info.svg" title="info" />
-              </fab-tooltip-host>
-            </div>
-            <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
+  <collapsible-list-fabric [collapsed]="collapse[0].collapsed" [title]="collapse[0].title">
+    <!--configure periscope run-->
+    <collapsible-list-item body>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-3 field-label"> Storage account Name <span class="required">*</span>
+            <fab-tooltip-host
+              content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
+              or an account with a shared access signature token"
+              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+              <img src="assets/img/info.svg" title="storage-account"/>
+            </fab-tooltip-host>
             <div class="col-sm-4">
-              <input aria-required="false" placeholder="sas key" [(ngModel)]="storageConfig.sasToken">
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
-              <fab-tooltip-host content="The blob container to store the logs of Periscope."
-                [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                <img src="assets/img/info.svg" title="info" />
-              </fab-tooltip-host>
-            </div>
-            <div class="col-sm-4">
-              <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
+              <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageConfig.resourceName">
               <span style="color:red">*</span>
-              <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-                The container will be created if not exist already.
+              <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+                The storage account is required.
               </div>
             </div>
-          </div>   <!--TODO list existing periscope runs -->
+          </div>
         </div>
-        <div class="mt-3 ml-3">
-          <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() && status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
-            Run AKS periscope
-          </fab-primary-button>
+        <div class="row">
+          <div class="col-md-3 field-label"> Storage Account SAS Key<span class="required">*</span>
+            <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
+              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+              <img src="assets/img/info.svg" title="info" />
+            </fab-tooltip-host>
+          </div>
+          <div class="col-sm-4">
+            <input aria-required="false" placeholder="sas key" [(ngModel)]="storageConfig.accountSasToken">
+          </div>
+          <div class="col-sm-4">
+            <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a>
+          </div>
         </div>
-      </collapsible-list-item>
-    </collapsible-list-fabric>
-    <collapsible-list-fabric [collapsed]="false" [title]="'Periscope Run Sessions'">
-      <collapsible-list-item body>
-        <div>
-          <ul>
-            <li *ngFor="let runConfig of periscopeSessions">
-              <fab-link (onClick)="openPeriscopeLogsBlade(runConfig)"> {{ runConfig.diagnosticRunId }} {{ runConfig.storage.resourceName }} - {{ runConfig.containerName }}  </fab-link>
-            </li>
-          </ul>
-        </div>
-        <ng-template #runningStatus>
-          <ul>
-            <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
-          </ul>
-        </ng-template>
-      </collapsible-list-item>
-    </collapsible-list-fabric>
+        <div class="row">
+          <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
+            <fab-tooltip-host content="The blob container to store the logs of Periscope."
+              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+              <img src="assets/img/info.svg" title="info" />
+            </fab-tooltip-host>
+          </div>
+          <div class="col-sm-4">
+            <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
+            <span style="color:red">*</span>
+            <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+              The container will be created if not exist already.
+            </div>
+          </div>
+        </div>   <!--TODO list existing periscope runs -->
+      </div>
+      <div class="mt-3 ml-3">
+        <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() || status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
+          Run AKS periscope
+        </fab-primary-button>
+      </div>
+      <ng-template #runningStatus>
+        <ul>
+          <li *ngFor="let runningStatusUpdate of diagnosticToolRunningStatus">{{ runningStatusUpdate }}</li>
+        </ul>
+      </ng-template>
+    </collapsible-list-item>
+  </collapsible-list-fabric>
 
-    
-  </div>
+  <collapsible-list-fabric [collapsed]="collapse[1].collapsed" [title]="collapse[1].title">
+    <collapsible-list-item body>
+      <div class="container">
+        <div class="row">
+          <div class="col-md-9">
+            <div *ngIf="periscopeSessions.length === 0">
+              No running session is availble.
+            </div>
+            <div *ngIf="periscopeSessions.length > 0">
+              <table class="table table-borderless">
+                <thead>
+                  <tr>
+                    <th tabindex="0" style="height: 50px;">Runtime</th>
+                    <th tabindex="0">Logs</th>
+                    <th tabindex="0">Analytics</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let runConfig of periscopeSessions">
+                    <td tabindex="0"> {{ runConfig.diagnosticRunId }}</td>
+                    <td>
+                      <div (click)="viewLogs(runConfig)">
+                        <a tabindex="0" aria-label="View logs">{{ runConfig.storage.resourceName }} - {{ runConfig.containerName }} </a>
+                      </div>
+                    </td>
+                    <td>
+                      <div *ngIf="runConfig.analyticResultHref" (click)="viewResult(runConfig)">
+                        <a tabindex="0" aria-label="View analytics"> View Analysis</a>
+                      </div>
+                      <span *ngIf="runConfig.analyticResultHref == null">Analysis Pending</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </collapsible-list-item>
+  </collapsible-list-fabric>
 </div>

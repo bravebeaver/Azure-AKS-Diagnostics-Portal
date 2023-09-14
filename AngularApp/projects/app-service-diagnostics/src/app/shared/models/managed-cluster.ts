@@ -1,6 +1,3 @@
-import { Observable } from "rxjs";
-import { OperatingSystem } from "./site";
-
 export class ManagedClusterMetaInfo  {
     resourceUri: string;
     subscriptionId: string;
@@ -24,6 +21,7 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
     servicePrincipalProfile: ServicePrincipalProfile;
     windowsProfile: WindowProfile;
     enableRBAC: boolean;
+    adminToken?: string;
   
     diagnosticSettings: DiagnosticSettingsResource[];
 }
@@ -39,10 +37,6 @@ export class DiagnosticSettingsResource {
     storageAccountConfig: StorageAccountConfig;
 }
 // managed cluster with admin token
-export class PrivateManagedCluster extends ManagedCluster {
-    adminToken?: string;
-}
-
 export class Identity {
     principalId: string;
     tenantId: string;
@@ -56,7 +50,7 @@ export class WindowProfile {
 export class AgentPoolProfile {
     name: string;
     count: number;
-    osType: OperatingSystem;
+    osType: string;
     provisioningState: string;
     type: string;
 }
@@ -69,12 +63,8 @@ export class ServicePrincipalProfile {
 export class StorageAccountConfig  {
     resourceUri?: string;
     resourceName?: string;
-    sasToken: string;
-    connectionString?: string;   
+    accountSasToken: string;
     
-    toString(): string {
-        return `StorageAccountConfig(storageAccountName=${this.resourceName}) - can connect? ${!!this.sasToken}`;
-    }
 }
 
 export class PeriscopeConfig {
@@ -84,4 +74,5 @@ export class PeriscopeConfig {
     containerName: string;
     
     storage: StorageAccountConfig;
+    analyticResultHref?: string;
 }

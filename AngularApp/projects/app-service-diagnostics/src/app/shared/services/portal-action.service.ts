@@ -10,9 +10,11 @@ import { AuthService } from '../../startup/services/auth.service';
 import { mergeMap, filter } from 'rxjs/operators';
 import { DetectorType, OptInsightsResource, OptInsightsTimeContext } from 'diagnostic-data';
 import { Globals } from '../../globals';
+import { PeriscopeConfig } from '../models/managed-cluster';
 
 @Injectable()
 export class PortalActionService {
+
     public apiVersion = '2016-08-01';
     public LoadTestingId: string = 'loadtestingcustomblade';
     
@@ -43,6 +45,19 @@ export class PortalActionService {
                     key: "categoryId",
                     value: category
                 }]
+            }
+        };
+
+        this._portalService.openBlade(bladeInfo, 'troubleshoot');
+    }
+
+    public openStorageBladeForCluster(periscopeRunConfig: PeriscopeConfig) {
+        const bladeInfo = {
+            detailBlade: 'BlobsBlade',
+            extension: 'Microsoft_Azure_Storage',
+            detailBladeInputs: {
+                storageAccountId: periscopeRunConfig.storage.resourceUri,
+                path: periscopeRunConfig.containerName
             }
         };
 
