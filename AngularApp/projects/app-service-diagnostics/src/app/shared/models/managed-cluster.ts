@@ -1,4 +1,4 @@
-export class ManagedClusterMetaInfo  {
+export class ManagedClusterMetaInfo {
     resourceUri: string;
     subscriptionId: string;
     resourceGroupName: string;
@@ -22,7 +22,7 @@ export class ManagedCluster extends ManagedClusterMetaInfo {
     windowsProfile: WindowProfile;
     enableRBAC: boolean;
     adminToken?: string;
-  
+
     diagnosticSettings: DiagnosticSettingsResource[];
 }
 
@@ -31,7 +31,7 @@ export class DiagnosticSettingsResource {
     properties: {
         storageAccountId: string
     };
-    name: string; 
+    name: string;
     location: string;
     logAnalyticsDestinationType: string;
     storageAccountConfig: StorageAccountConfig;
@@ -60,11 +60,11 @@ export class ServicePrincipalProfile {
 }
 // from https://learn.microsoft.com/en-us/rest/api/monitor/diagnostic-settings/list?tabs=HTTP#diagnosticsettingsresource
 
-export class StorageAccountConfig  {
+export class StorageAccountConfig {
     resourceUri?: string;
     resourceName?: string;
     accountSasToken: string;
-    
+
 }
 
 export class PeriscopeConfig {
@@ -72,7 +72,8 @@ export class PeriscopeConfig {
     linuxTag?: string;
     windowsTag?: string;
     containerName: string;
-    
+
     storage: StorageAccountConfig;
     analyticResultHref?: string;
+    startAt: Date;
 }

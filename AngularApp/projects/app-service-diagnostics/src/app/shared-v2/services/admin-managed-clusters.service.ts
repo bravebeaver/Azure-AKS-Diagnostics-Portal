@@ -5,8 +5,8 @@ import  * as JSZip  from 'jszip';
 import * as yaml from 'yaml';
 
 
-import {BehaviorSubject,  Observable,  combineLatest,  forkJoin,  from, identity, of, timer } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap, repeatWhen, delay, scan} from 'rxjs/operators';
+import {BehaviorSubject,  EMPTY,  Observable,  combineLatest,  concat,  forkJoin,  from, identity, of, timer } from 'rxjs';
+import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap, repeatWhen, delay, scan, last, subscribeOn, concatMap} from 'rxjs/operators';
 import { ResourceDescriptor, StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
@@ -18,10 +18,14 @@ import { ResourceType, StartupInfo } from '../../shared/models/portal';
 import { ResponseMessageCollectionEnvelope, ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
 import { StorageService } from '../../shared/services/storage.service';
 import { join } from 'path';
+import * as moment from 'moment';
+import { Moment } from 'moment';
+import { ScaleUpSolutionComponent } from '../../solutions/components/specific-solutions/scale-up-solution/scale-up-solution.component';
+import { Observer } from 'rxjs/Rx';
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
-const RUN_COMMAND_INTERVAL_MS: number = 2000;
-const POLL_LOG_INITIAL_DELAY_MS: number = 5000;
+// seems to take that long
+const RUN_COMMAND_INTERVAL_MS: number = 5000;
 const YAML_SEPARATOR: string = "---\n";
 @Injectable()
 export class AdminManagedClustersService {
@@ -29,7 +33,9 @@ export class AdminManagedClustersService {
 
   public managedCluster: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
-  public diagnosticSettingsApiVersion =  "2021-05-01-preview";
+  public diagnosticSettingsApiVersion = "2021-05-01-preview";
+  public RFC_3336: string = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
+  private periscopeLogs: BehaviorSubject<string[]> = new BehaviorSubject<string[]>([]);
 
   constructor(
     private _authService: AuthService, 
@@ -107,7 +113,7 @@ export class AdminManagedClustersService {
 
   private _populateManagedClusterMetaInfo(resourceId: string) {
     const pieces = resourceId.toLowerCase().split('/');
-    const managedClusterMetaInfo =  <ManagedClusterMetaInfo>{
+    const managedClusterMetaInfo = <ManagedClusterMetaInfo>{
         resourceUri: resourceId,
         subscriptionId: pieces[pieces.indexOf('subscriptions') + 1],
         resourceGroupName: pieces[pieces.indexOf('resourcegroups') + 1],
@@ -119,6 +125,7 @@ export class AdminManagedClustersService {
 
   //POST https://management.azure.com/${resourceUri}/runCommand?api-version=2023-07-01
   private runCommandInCluster(command: string, context?: string): Observable<RunCommandResult> {
+    console.log(`runCommand ${command} in cluster`);
       return this.managedCluster.pipe(
         switchMap( (privateManagedCluter : ManagedCluster) => {
           const commandRequest: RunCommandRequest = {
@@ -150,8 +157,7 @@ export class AdminManagedClustersService {
     // TODO implement timeout
     const privateManagedCluter : ManagedCluster = this.managedCluster.getValue();
     return timer(RUN_COMMAND_INITIAL_POLL_WAIT_MS, RUN_COMMAND_INTERVAL_MS).pipe(
-      switchMap((retryAttempt: number) => {
-        console.log(`polling result of runCommand for the ${retryAttempt} times ...`)
+      switchMap(() => {
         return this._armClient.getResourceFullResponse<RunCommandResult>(`${privateManagedCluter.resourceUri}/${ManagedClusterCommandApi.GET_COMMAND_RESULT}/${commandId}`, true);
       }),
       takeWhile(runCommandResult => {
@@ -160,41 +166,65 @@ export class AdminManagedClustersService {
       }, true),
       takeLast(1)
     ).pipe(
-      map((runCommandResult: HttpResponse<RunCommandResult>) => runCommandResult.body));  
+      map((runCommandResult: HttpResponse<RunCommandResult>) => runCommandResult.body)
+    );  
   }
 
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
-    return forkJoin([this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
+    return forkJoin([
+      this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
       this.createPeriscopeContext(periscopeConfig)]).pipe(
         switchMap(([containerCreated, periscopeContext]: [boolean, string]) => {
           return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -f ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
       }));
   }
+    
+  pollPeriscopeResult(since: Moment): Observable<string[]> {  
+    return this.retrievePeriscopeLogs(since).pipe(
+      concatMap((logs: string[]) => {
+        let [finished, lastTimestmap] = this.parsePeriscopeLogs(logs); 
+        if (!finished) {
+          logs.push(`Periscope is still running, polling more logs...`);
+          return concat(
+            of(logs), 
+            this.pollPeriscopeResult(lastTimestmap || since)
+          );
+        }
+        console.log("finished polling periscope logs");
+        return of(logs);
+      })
+    );
+  }
 
-  pollPeriscopeResult(): Observable<String[]> {
-    return of(null).pipe(
-      delay(POLL_LOG_INITIAL_DELAY_MS),
-      switchMap(() => {
-        return this.getPeriscopeLogs();  
-      }), 
-      repeatWhen((completed) => completed.pipe(
-        takeWhile((logs: string[]) => {
-          return !logs || logs[logs.length-1].indexOf("Completed Periscope run") < 0;
-        }, true)
-      )), 
-      scan((acc, curr) => [ ...acc, curr], [])
-    ); 
+  parsePeriscopeLogs(logs: string[]): [boolean, Moment] {
+    let lastTimestamp: Moment = null;
+    let finished = false;
+    if (!logs || logs.length == 0) {
+      return [finished, lastTimestamp];
+    }
+    
+    const lastLine = logs[logs.length-1];
+    // parse the string in the formatm of 2023/09/14 23:33:11 Completed Periscope run 2023-09-15T11:32:23
+    const logParts = lastLine.match(/^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) (.*)/);
+    if (logParts) {
+      lastTimestamp = moment(logParts[1], "YYYY/MM/DD HH:mm:ss").utc();
+      finished = logParts[2].indexOf("Completed Periscope run") >= 0;
+    } 
+    return [finished, lastTimestamp];
   }
   
-  getPeriscopeLogs(): Observable<string[]> {
-    console.log("get periscope logs from cluster");
-    return this.runCommandInCluster(`${InClusterDiagnosticCommands.GET_PERISCOPE_LOGS}`).pipe(
+  retrievePeriscopeLogs(since: Moment): Observable<string[]> {
+    return this.runCommandInCluster(`${InClusterDiagnosticCommands.GET_PERISCOPE_LOGS} --since-time=${since.format(this.RFC_3336)}`).pipe(
       switchMap((submitCommandResult: RunCommandResult) => {
         return this.getRunCommandResult(submitCommandResult.id)
       })
     ).pipe(
       map((runCommandResult: RunCommandResult) => {
-        return runCommandResult.properties.logs.split('\n');
+        if(!!runCommandResult.properties && !!runCommandResult.properties.logs) {
+          return runCommandResult.properties.logs.trim().split('\n');
+        } else {
+          return [];
+        }
       })
     );
   }

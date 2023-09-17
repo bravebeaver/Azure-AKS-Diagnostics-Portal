@@ -10,7 +10,6 @@ import { AdminManagedClustersService } from '../../../../shared-v2/services/admi
 
 import {  PeriscopeConfig, ManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
 import { TelemetryService } from 'diagnostic-data';
-import { Globals } from 'projects/app-service-diagnostics/src/app/globals';
 import { PortalActionService } from '../../../services/portal-action.service';
 
 @Component({
@@ -26,6 +25,7 @@ export class AksPeriscopeComponent implements OnInit {
 
   @Input() storageConfig: StorageAccountConfig = new StorageAccountConfig();
   @Input() containerName: string;
+  @Input() diagnosticRunId: string;
   @Input() windowsTag: string = "0.0.13";
   @Input() linuxTag: string = "0.0.13";
   
@@ -54,7 +54,8 @@ export class AksPeriscopeComponent implements OnInit {
         return;
       }
       this.loaded();
-      this.containerName = managedCluster.name + '-periscope';
+      this.containerName = `periscope-${managedCluster.name}-${moment().format('YYYY-MM-DD')}`;
+      this.diagnosticRunId = moment().format('YYYY-MM-DDTHH:mm:ss');
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
         //TODO which one to use? get drop down from UI and ask user to choose.
         this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
@@ -71,9 +72,6 @@ export class AksPeriscopeComponent implements OnInit {
     });
   }
 
-  loaded() {
-  this.updateMessages(null, ToolStatus.Loaded);
-  }
 
   retrievePeriscopeSessions() {
     //TODO read from storage account and the blob container name
@@ -93,33 +91,41 @@ export class AksPeriscopeComponent implements OnInit {
 
     let periscopeConfig = <PeriscopeConfig>{
       storage : this.storageConfig,
-      diagnosticRunId: moment().format('YYYY-MM-DDTHH:mm:ss'), 
+      diagnosticRunId: this.diagnosticRunId,
       containerName: this.containerName,
       linuxTag: this.linuxTag,
-      windowsTag: this.windowsTag
+      windowsTag: this.windowsTag, 
+      startAt: new Date()
     };
 
     this.prepareNewSession();
     
     this._adminManagedCluster.runCommandPeriscope(periscopeConfig).pipe(
       switchMap( (submitCommandResult: RunCommandResult) => {
-        this.updateRunningStatus([`Command submitted with ID - ${submitCommandResult.id}`, `Please wait for result...`]);
+        this.updateRunningStatus([`Command submitted with ID - ${submitCommandResult.id}`, `Polling runCommand result...`]);
         return this._adminManagedCluster.getRunCommandResult(submitCommandResult.id);
       })
     ).subscribe((runCommandResult: RunCommandResult) => {
-        this.periscopeSessions.push(periscopeConfig);
         const commandResult = runCommandResult.properties.logs.split('\n');
-        this.updateRunningStatus(commandResult);
-        this.updateRunningStatus([`Retrieving periscope running logs...`]);
-        this._adminManagedCluster.pollPeriscopeResult().subscribe((periscopeLogs: string[]) => {
-          this.completeRunningStatus(periscopeLogs);
+        this.updateRunningStatus([...commandResult, `Retrieving periscope logs, it might serveral minutes depending on the size of cluster`]);
+        
+        this._adminManagedCluster.pollPeriscopeResult(moment.utc(periscopeConfig.startAt)).subscribe((periscopeLogs: string[]) => {
+          if (!periscopeLogs || periscopeLogs.length == 0) {
+            this.updateRunningStatus([`No logs received yet. keep trying...`]);
+          } else {
+            this.updateRunningStatus(periscopeLogs);
+      
+            if (!this.periscopeSessions.some(session => session.diagnosticRunId == periscopeConfig.diagnosticRunId)) {
+              this.periscopeSessions.push(periscopeConfig);
+            }
+          }
         });
     }); 
   }
 
   prepareNewSession() {
     this.errorMessage = null;
-    this.toolRunningMessages = [];
+    this.toolRunningMessages = ['Starting new session...'];
 
     this.collapse[1].collapsed = false;
 
@@ -134,24 +140,32 @@ export class AksPeriscopeComponent implements OnInit {
 
   updateMessages(messages: string|string[], status: ToolStatus) {
     this.status = status;
+
+    if (status != ToolStatus.Error) {
+      this.errorMessage = null;
+    }
+
     switch (status) {
       case ToolStatus.Loading:
         this.loadingMessage = messages as string;
-        this.errorMessage = null;
+        break;
+      case ToolStatus.Loaded:
+        this.loadingMessage = null;
         break;
       case ToolStatus.PollingResult:
         this.toolRunningMessages.push(...(messages as string[]));
         break;
-      case ToolStatus.Submitted:
+      case ToolStatus.Done:
         this.toolRunningMessages.push(...(messages as string[]));
         break;
       case ToolStatus.Error:
         this.errorMessage = messages as string;
         break;
-      case ToolStatus.Loaded:
-        this.errorMessage = null;
-        this.loadingMessage = null;
     }
+  }
+  
+  loaded() {
+    this.updateMessages(null, ToolStatus.Loaded);
   }
 
   updateLoadingMessage(message: string) {
@@ -162,8 +176,9 @@ export class AksPeriscopeComponent implements OnInit {
     this.updateMessages(messages, ToolStatus.PollingResult);
   }
 
-  completeRunningStatus(messages: string[]) {
-    this.updateMessages(messages, ToolStatus.Submitted);
+  completeRunningStatus(message: string) {
+    this.updateMessages([message], ToolStatus.Done);
+    this.diagnosticRunId = moment().format('YYYY-MM-DDTHH:mm:ss');
     this.collapse[2].collapsed = false;
   }
 
@@ -192,11 +207,11 @@ export class AksPeriscopeComponent implements OnInit {
 }
 
 export enum ToolStatus {
-  Loading,
-  Loaded,
-  Running,
-  PollingResult,
-  Submitted,
+  Loading, // when the page is loading
+  Loaded, // when the cluster is laoded
+  Running, // when a runCommand has been submitted
+  PollingResult, // when a runCommand has been submitted and we are polling for result
+  Done, // when a runCommand has been submitted and we have the result
   Error
 }
 
