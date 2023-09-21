@@ -62,6 +62,7 @@ export class ServicePrincipalProfile {
 
 export class StorageAccountConfig {
     resourceUri?: string;
+    subscriptionId?: string;
     resourceName?: string;
     accountSasToken: string;
 
@@ -74,6 +75,6 @@ export class PeriscopeConfig {
     containerName: string;
 
     storage: StorageAccountConfig;
-    analyticResultHref?: string;
-    startAt: Date;
+
+    runningStatus?: string;
 }

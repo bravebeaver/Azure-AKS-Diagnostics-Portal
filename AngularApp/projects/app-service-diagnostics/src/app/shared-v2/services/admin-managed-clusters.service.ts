@@ -5,8 +5,8 @@ import  * as JSZip  from 'jszip';
 import * as yaml from 'yaml';
 
 
-import {BehaviorSubject,  EMPTY,  Observable,  combineLatest,  concat,  forkJoin,  from, identity, of, timer } from 'rxjs';
-import { map, switchMap,takeWhile, takeLast, filter, tap, mergeMap, repeatWhen, delay, scan, last, subscribeOn, concatMap} from 'rxjs/operators';
+import {BehaviorSubject,    Observable, concat,  forkJoin,  from, of, timer } from 'rxjs';
+import { map, switchMap,takeWhile, takeLast, filter, mergeMap,  concatMap} from 'rxjs/operators';
 import { ResourceDescriptor, StringUtilities } from "diagnostic-data";
 
 import { ArmService } from '../../shared/services/arm.service';
@@ -17,11 +17,9 @@ import { AuthService } from '../../startup/services/auth.service';
 import { ResourceType, StartupInfo } from '../../shared/models/portal';
 import { ResponseMessageCollectionEnvelope, ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
 import { StorageService } from '../../shared/services/storage.service';
-import { join } from 'path';
 import * as moment from 'moment';
 import { Moment } from 'moment';
-import { ScaleUpSolutionComponent } from '../../solutions/components/specific-solutions/scale-up-solution/scale-up-solution.component';
-import { Observer } from 'rxjs/Rx';
+
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
 // seems to take that long
@@ -35,7 +33,6 @@ export class AdminManagedClustersService {
   public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
   public diagnosticSettingsApiVersion = "2021-05-01-preview";
   public RFC_3336: string = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
-  private periscopeLogs: BehaviorSubject<string[]> = new BehaviorSubject<string[]>([]);
 
   constructor(
     private _authService: AuthService, 
@@ -101,14 +98,27 @@ export class AdminManagedClustersService {
       }));
   }
 
+  //https://learn.microsoft.com/en-us/rest/api/storageservices/list-blobs?tabs=azure-ad
+  pollPeriscopeBlobResult(periscopeConfig: PeriscopeConfig): string {
+      //https://docs.microsoft.com/en-us/rest/api/storagerp/blobcontainers/create
+    var params = [`prefix=${encodeURIComponent(periscopeConfig.diagnosticRunId)}`, `showonly=directories`, `restype=container`, `comp=list`].join("&");
+    return `https://${periscopeConfig.storage.resourceName}.blob.core.windows.net/${periscopeConfig.containerName}?${params}`;
+  }
+
+
   populateStorageAccountConfig(diagnosticSetting: DiagnosticSettingsResource): Observable<StorageAccountConfig> {
     const resourceUri = diagnosticSetting.properties.storageAccountId;
         
     return this._storageService.generateSasKey(resourceUri, '').pipe(
       map((sasKey: string) => {
         const storageAccountDesc = ResourceDescriptor.parseResourceUri(resourceUri);
-       return <StorageAccountConfig>{accountSasToken: sasKey, resourceUri: resourceUri, resourceName: storageAccountDesc.resource};
-    }));
+        return <StorageAccountConfig>{
+          accountSasToken: sasKey,  
+          resourceUri: resourceUri, 
+          resourceName: storageAccountDesc.resource, 
+          subscriptionId: storageAccountDesc.subscription
+        };
+      }));
   };
 
   private _populateManagedClusterMetaInfo(resourceId: string) {
@@ -172,14 +182,15 @@ export class AdminManagedClustersService {
 
   runCommandPeriscope(periscopeConfig: PeriscopeConfig): Observable<RunCommandResult> {
     return forkJoin([
-      this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
-      this.createPeriscopeContext(periscopeConfig)]).pipe(
+        this._storageService.createContainerIfNotExists(periscopeConfig.storage.resourceUri, periscopeConfig.containerName), 
+        this.createPeriscopeContext(periscopeConfig)])
+      .pipe(
         switchMap(([containerCreated, periscopeContext]: [boolean, string]) => {
           return this.runCommandInCluster(`${InClusterDiagnosticCommands.APPLY} -f ${RunCommandContextConfig.PERISCOPE_MANIFEST}`, periscopeContext);
       }));
   }
     
-  pollPeriscopeResult(since: Moment): Observable<string[]> {  
+  pollPeriscopeLogs(since: Moment): Observable<string[]> {  
     return this.retrievePeriscopeLogs(since).pipe(
       concatMap((logs: string[]) => {
         let [finished, lastTimestmap] = this.parsePeriscopeLogs(logs); 
@@ -187,7 +198,7 @@ export class AdminManagedClustersService {
           logs.push(`Periscope is still running, polling more logs...`);
           return concat(
             of(logs), 
-            this.pollPeriscopeResult(lastTimestmap || since)
+            this.pollPeriscopeLogs(lastTimestmap || since)
           );
         }
         console.log("finished polling periscope logs");

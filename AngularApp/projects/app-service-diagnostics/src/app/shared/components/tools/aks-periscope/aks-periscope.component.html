@@ -24,19 +24,19 @@
 
   <div style="margin-top:10px;margin-bottom: 5px">
     <div *ngIf="status == toolStatus.Loading">
-      <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
-      <span>{{ loadingMessage }}</span>
+      <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true">Running </i>
     </div>
-
-    <div class="row" *ngIf=" errorMessage">
-      <div class="col-md-6 error-details">
-        <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
-        <span>{{ errorMessage }}</span>
-      </div>
+    <div *ngIf=" status == toolStatus.Error">
+      <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true">Error</i>
+    </div>
+    <div>
+      <ul>
+        <li *ngFor="let toolMessage of toolMessages">{{ toolMessage }}</li>
+      </ul> 
     </div>
   </div>  
 
-  <collapsible-list-fabric [collapsed]="collapse[0].collapsed" [title]="collapse[0].title">
+  <collapsible-list-fabric [collapsed]="false" title="Configure new Session">
     <!--configure periscope run-->
     <collapsible-list-item body>
       <div class="container">
@@ -96,36 +96,21 @@
         </div>  <!--TODO list existing periscope runs -->
       </div>
       <div class="mt-3 ml-3">
-        <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() || status == toolStatus.Running" (onClick)="runInClusterPeriscope()">
-          Run AKS periscope
+        <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() || isProcessingNewSession()" (onClick)="runInClusterPeriscope()">
+          {{!isValidStorageConfig() || isProcessingNewSession() ? 'Submitting session to cluster' : 'Run Periscope in Cluster'  }}
         </fab-primary-button>
       </div>
     </collapsible-list-item>
   </collapsible-list-fabric>
 
-  <collapsible-list-fabric [collapsed]="collapse[1].collapsed" [title]="collapse[1].title">
-    <collapsible-list-item body>
-      <div class="container">
-        <div class="col-md-9 ">
-          <div *ngIf="status == toolStatus.PollingResult">
-            <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
-          </div>
-          <ul>
-            <li *ngFor="let runningMessage of toolRunningMessages">{{ runningMessage }}</li>
-          </ul> 
-        </div>
-      </div>
-    </collapsible-list-item>
-  </collapsible-list-fabric>
-
-  <collapsible-list-fabric [collapsed]="collapse[2].collapsed" [title]="collapse[2].title">
+  <collapsible-list-fabric [collapsed]="periscopeSessions.length === 0" title="Historical Sessions">
     <collapsible-list-item body>
       <div class="container">
         <div class="row">
           <div class="col-md-9">
             <div *ngIf="periscopeSessions.length === 0 else toolSessions">
               <fab-tooltip-host content="Only sessions available to AKS are displayed here" [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                No historical session is availble.
+                No known sessions.
               </fab-tooltip-host>
             </div>
 
@@ -133,24 +118,40 @@
               <table class="table table-borderless">
                 <thead>
                   <tr>
-                    <th tabindex="0" style="height: 50px;">Runtime/ Diagnostic Id</th>
-                    <th tabindex="0">Logs</th>
-                    <th tabindex="0">Analytics</th>
+                    <th tabindex="0">Runtime/ Diagnostic Id</th>
+                    <th tabindex="0">Running Status</th>
+                    <th tabindex="0">View in Blob Container</th>
+                    <th tabindex="0">Open in Storage Explorer</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let runConfig of periscopeSessions">
-                    <td tabindex="0"> {{ runConfig.diagnosticRunId }}</td>
+                  <tr *ngFor="let session of periscopeSessions">
+                    <td tabindex="0"> {{ session.config.diagnosticRunId }} </td>
                     <td>
-                      <div (click)="viewLogs(runConfig)">
-                        <a tabindex="0" aria-label="View logs">{{ runConfig.storage.resourceName }} - {{ runConfig.containerName }} </a>
+                      <div *ngIf="session.status == sessionStatus.Running">
+                        <i class="fa fa-spinner fa-spin"></i> Running...
+                      </div>
+                      <div *ngIf="(session.status == sessionStatus.Error || session.status == sessionStatus.Abandoned)">
+                        <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
+                        <span> Timeout retrieving runCommand status. The job might still be running</span>
+                      </div>
+                      <div *ngIf="(session.status == sessionStatus.Finsihed)">
+                        <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
+                        <span> Completed</span>
+                      </div>
+                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="getPeriscopeLogs(session)">
+                        <a tabindex="0" aria-label="view logs"> Get logs </a> 
                       </div>
                     </td>
                     <td>
-                      <div *ngIf="runConfig.analyticResultHref" (click)="viewResult(runConfig)">
-                        <a tabindex="0" aria-label="View analytics"> View Analysis</a>
+                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
+                        <a tabindex="0" aria-label="view result">{{ session.config.containerName }} </a>
                       </div>
-                      <span *ngIf="runConfig.analyticResultHref == null">Analysis Pending</span>
+                    </td>
+                    <td>
+                      <div *ngIf="session.status == sessionStatus.Finished || session.status == sessionStatus.Abandoned ">
+                        <a tabindex="0" aria-label="view result" [href]="session.resultHref"> Copy Link </a>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -160,5 +161,21 @@
         </div>
       </div>
     </collapsible-list-item>
+  </collapsible-list-fabric>
+
+  <collapsible-list-fabric [collapsed]="clusterMessages.length == 0" title="Logs and Outputs">
+    <collapsible-list-item body>
+      <div class="container">
+        <div class="col-md-9 ">
+          <div *ngIf="hasRunningSession()">
+            <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true"></i>
+          </div>
+          <ul>
+            <li *ngFor="let runningMessage of clusterMessages">{{ runningMessage }}</li>
+          </ul> 
+        </div>
+      </div>
+    </collapsible-list-item>
+  
   </collapsible-list-fabric>
 </div>
