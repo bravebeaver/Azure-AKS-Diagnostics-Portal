@@ -8,10 +8,10 @@ import * as moment from 'moment';
 import { RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
 import { AdminManagedClustersService } from '../../../../shared-v2/services/admin-managed-clusters.service';
 
-import {  PeriscopeConfig, ManagedCluster, StorageAccountConfig } from '../../../models/managed-cluster';
+import {  PeriscopeConfig, ManagedCluster, StorageAccountConfig, DiagnosticSettingsResource } from '../../../models/managed-cluster';
 import { TelemetryService } from 'diagnostic-data';
+import { PortalService } from 'projects/app-service-diagnostics/src/app/startup/services/portal.service';
 import { PortalActionService } from '../../../services/portal-action.service';
-import { map } from 'highcharts';
 
 
 @Component({
@@ -21,13 +21,21 @@ import { map } from 'highcharts';
 })
 export class AksPeriscopeComponent implements OnInit {
 
+  constructor(
+    private _adminManagedCluster: AdminManagedClustersService, 
+    private _portalService: PortalService, 
+    private telemetryService: TelemetryService) {
+  }
 
   @Input() storageConfig: StorageAccountConfig = new StorageAccountConfig();
+
   @Input() containerName: string;
   @Input() diagnosticRunId: string;
   @Input() windowsTag: string = "0.0.13";
   @Input() linuxTag: string = "0.0.13";
 
+  diagnosticSettings: DiagnosticSettingsResource[];
+  diagnosticSettingSelected: DiagnosticSettingsResource;
   
   //UI stuff
   status: ToolStatus = ToolStatus.Loading;
@@ -38,14 +46,11 @@ export class AksPeriscopeComponent implements OnInit {
   clusterMessages: string[] = [];
 
   periscopeSessions: PeriscopeSession[] = [];
+  currentCluster: ManagedCluster;
 
   private RUN_COMMAND_RESULT_POLL_WAIT_MS : number = 30000;
   
-  constructor(
-    private _adminManagedCluster: AdminManagedClustersService, 
-    private _portalActionService: PortalActionService, 
-    private telemetryService: TelemetryService) {
-  }
+
   
   ngOnInit() {
     this._adminManagedCluster.managedCluster.subscribe((managedCluster: ManagedCluster )=> {
@@ -54,30 +59,28 @@ export class AksPeriscopeComponent implements OnInit {
         this.updateToolMessages("No cluster selected", ToolStatus.Error);
         return;
       }
+      this.currentCluster = managedCluster;
       this.updateToolMessages("Cluster loaded", ToolStatus.Loaded);
       
       this.containerName = `periscope-${managedCluster.name}`;
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
         //TODO which one to use? get drop down from UI and ask user to choose.
-        this._adminManagedCluster.populateStorageAccountConfig(managedCluster.diagnosticSettings[0]).subscribe((config: StorageAccountConfig) => {
-          this.storageConfig = config;
-          this.retrievePeriscopeSessions();
-        });
-      } else {
-        // TODO might toggle storage account later;
-        // this.getPeriscopeStorageAccount().subscribe((config: StorageAccountConfig) => {
-        //   this.updateStorageAccount(config);
-        // });
+        this.diagnosticSettings = managedCluster.diagnosticSettings;
+        this.diagnosticSettingSelected = this.diagnosticSettings[0];
+        this.onDiagSettingSelectionChange();
       } 
-      
       this.resetSessionConfig();
     });
   }
 
-
-  retrievePeriscopeSessions() {
-    //TODO read from storage account and the blob container name
-    this.periscopeSessions = [];
+  onDiagSettingSelectionChange() {
+    this._adminManagedCluster.populateStorageAccountConfig(this.diagnosticSettingSelected).subscribe((config: StorageAccountConfig) => {
+      if (!!config) {
+        this.storageConfig = config;
+      } else {
+        this.storageConfig = new StorageAccountConfig()
+      }
+    });
   }
 
   resetSessionConfig() {
@@ -123,6 +126,12 @@ export class AksPeriscopeComponent implements OnInit {
       status: SessionStatus.Created, 
       startAt: new Date(),
     });
+  }
+
+  toggleStorageAccountPanel() {
+    this.telemetryService.logEvent("OpenCreateStorageAccountPanel");
+    this.telemetryService.logPageView("CreateStorageAccountPanelView");
+
   }
 
   processNewSession(session: PeriscopeSession) {
@@ -174,7 +183,6 @@ export class AksPeriscopeComponent implements OnInit {
         if (!periscopeLogs || periscopeLogs.length == 0) {
           this.clusterMessages.push(`No logs received yet. keep trying...`);
         } else {
-          console.log("periscope logs", periscopeLogs.join('\n'));
           this.clusterMessages.push(...periscopeLogs);
           session.status = SessionStatus.Finished;
         }
@@ -187,12 +195,65 @@ export class AksPeriscopeComponent implements OnInit {
     );
   }
 
+
   openStorageContainerBlade(session: PeriscopeSession) {
-    this.telemetryService.logEvent("OpenPeriscopeLogPanel");
-    this.telemetryService.logPageView("PeriscopeLogPanelView");
-    this._portalActionService.openStorageBlade(session.config);
+    this.telemetryService.logEvent("OpenPeriscopeResultPanel");
+    this.telemetryService.logPageView("PeriscopeResultView");
+
+    const bladeInfo = {
+      detailBlade: 'BlobsBlade',
+      extension: 'Microsoft_Azure_Storage',
+      detailBladeInputs: {
+        storageAccountId: session.config.storage.resourceUri,
+        path: session.config.containerName
+      }
+    };
+    this._portalService.openBlade(bladeInfo, 'troubleshoot');
   }
-  
+
+  openSelectStorageAccountBlade() {
+  this.telemetryService.logEvent("OpenCreateDiagnosticSettingPanel");
+      this.telemetryService.logPageView("CreateDiagnosticSettingPeriscopeView");
+
+      const bladeInfo = {
+        detailBlade: 'StorageExplorerBlade',
+        extension: 'Microsoft_Azure_Storage',
+        detailBladeInputs: {
+          // storageAccountId: session.config.storage.resourceUri,
+          // path: session.config.containerName
+        }
+      };
+      this._portalService.openBlade(bladeInfo, 'troubleshoot');
+  }
+
+  openNewDiagnosticSettingBlade() {
+    this.telemetryService.logEvent("OpenCreateDiagnosticSettingPanel");
+    this.telemetryService.logPageView("CreateDiagnosticSettingPeriscopeView");
+
+    // const bladeInfo = {
+    //   detailBlade: 'StorageAccountSelectorBlade',
+    //   extension: 'Microsoft_Azure_Monitoring',
+    //   detailBladeInputs: {
+    //     // storageAccountId: session.config.storage.resourceUri,
+    //     // path: session.config.containerName
+    //     resourceId: this.currentCluster.resourceUri,
+    //   }
+    // };
+    // this._portalService.openBlade(bladeInfo, 'troubleshoot');
+    
+
+  const bladeInfo = {
+      detailBlade: 'StorageAccountSelectorBlade',
+      extension: 'Microsoft_Azure_Monitoring',
+      detailBladeInputs:  {
+        resourceId: this.currentCluster.resourceUri
+    },
+  };
+
+  this._portalService.openBlade(bladeInfo, 'troubleshoot');
+
+  }
+
   updateToolMessages(arg: string|string[], status: ToolStatus) {
     // reset status message if we are not in error state
     if (  this.status == ToolStatus.Error && status != ToolStatus.Error) {

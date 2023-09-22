@@ -51,19 +51,6 @@ export class PortalActionService {
         this._portalService.openBlade(bladeInfo, 'troubleshoot');
     }
 
-    public openStorageBlade(periscopeRunConfig: PeriscopeConfig) {
-        const bladeInfo = {
-            detailBlade: 'BlobsBlade',
-            extension: 'Microsoft_Azure_Storage',
-            detailBladeInputs: {
-                storageAccountId: periscopeRunConfig.storage.resourceUri,
-                path: periscopeRunConfig.containerName
-            }
-        };
-
-        this._portalService.openBlade(bladeInfo, 'troubleshoot');
-    }
-
     public openBladeDiagnoseDetectorId(category: string, detector: string, type: DetectorType = DetectorType.Detector, startTime?: string, endTime ?: string) {
         const bladeInfo = {
             title: category,

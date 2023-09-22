@@ -39,62 +39,87 @@
   <collapsible-list-fabric [collapsed]="false" title="Configure new Session">
     <!--configure periscope run-->
     <collapsible-list-item body>
-      <div class="container">
-        <div class="row">
-          <div class="col-md-3 field-label"> Storage account Name <span class="required">*</span>
-            <fab-tooltip-host
-              content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
-              or an account with a shared access signature token"
-              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-              <img src="assets/img/info.svg" title="storage-account"/>
-            </fab-tooltip-host>
-            <div class="col-md-4 col-sm-4">
-              <input aria-required="true" placeholder="storage account name" [(ngModel)]="storageConfig.resourceName">
-              <span style="color:red">*</span>
-              <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-                The storage account is required.
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-3 field-label"> Storage Account SAS Key
-            <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
-              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-              <img src="assets/img/info.svg" title="info" />
-            </fab-tooltip-host>
-          </div>
+      <div class="row">
+        <div class="col-md-3 field-label"> Storage account <span class="required">*</span>
+          <fab-tooltip-host
+            content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
+            or an account with a shared access signature token"
+            [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+            <img src="assets/img/info.svg" title="storage-account"/>
+          </fab-tooltip-host>
+
           <div class="col-md-5 col-sm-4">
-            <input aria-required="false" placeholder="sas token" [(ngModel)]="storageConfig.accountSasToken">
+            <input aria-required="false" placeholder="storage account" [(ngModel)]="storageConfig.resourceName">
+            <!-- <a tabindex="0" aria-label="choose account" (onClick)="openSelectStorageAccountBlade()" > Choose </a> -->
           </div>
-        </div>
-        <div class="row">
-          <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
-            <fab-tooltip-host content="The blob container to store the logs of Periscope."
-              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-              <img src="assets/img/info.svg" title="info" />
-            </fab-tooltip-host>
-          </div>
-          <div class="col-md-5 col-sm-4">
-            <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
+
+          <div class="col-md-4 col-sm-4">
             <span style="color:red">*</span>
-            <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-              The container will be created if not exist already.
+            <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+              The storage account is required.
             </div>
           </div>
-        </div>  
-        <div class="row">
-          <div class="col-md-3 field-label">Diagnostic RunId <span class="required">*</span>
-            <fab-tooltip-host content="The ID of the run. It should be unique per Periscope deployment."
-              [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-              <img src="assets/img/info.svg" title="info" />
-            </fab-tooltip-host>
-          </div>
-          <div class="col-md-5 col-sm-4">
-            <input aria-required="true" placeholder="e.g., YYYY-DD-MMTHH:mm:SS" [(ngModel)]="diagnosticRunId">
-          </div>
-        </div>  <!--TODO list existing periscope runs -->
+        </div>
       </div>
+
+      <div class="row">
+        <collapsible-list-fabric [collapsed]="false" title="Use Diagnostic Settings">
+          <div header class="container">
+            <div header class="summaryText">
+              Periscope can write logs to the storage account configured in the cluster diagnostic settings.
+            </div>
+          </div>
+          <collapsible-list-item body>          
+            <div *ngIf="diagnosticSettings.length > 0">
+              <label for="chooseDiagSettings">Choose Diagnostic Settings</label>
+              <select id="chooseDiagSettings" class="ml-4"  (change)="onDiagSettingSelectionChange($event.target)" [(ngModel)]="diagnosticSettingSelected">
+                <option *ngFor="let diagSetting of diagnosticSettings" [ngValue]="diagSetting" > {{ diagSetting.name }}</option>
+              </select>
+            </div>
+          </collapsible-list-item>
+        </collapsible-list-fabric>
+      </div>
+
+      <div class="row">
+        <div class="col-md-3 field-label"> Storage Account SAS Key
+          <fab-tooltip-host content="If you do not own the storage account specified above, you can specify a SAS token to access the storage account."
+            [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+            <img src="assets/img/info.svg" title="info" />
+          </fab-tooltip-host>
+        </div>
+        <div class="col-md-5 col-sm-4">
+          <input aria-required="false" placeholder="sas token" [(ngModel)]="storageConfig.accountSasToken">
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
+          <fab-tooltip-host content="The blob container to store the logs of Periscope."
+            [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+            <img src="assets/img/info.svg" title="info" />
+          </fab-tooltip-host>
+        </div>
+        <div class="col-md-5 col-sm-4">
+          <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
+          <span style="color:red">*</span>
+          <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
+            The container will be created if not exist already.
+          </div>
+        </div>
+      </div>  
+        
+      <div class="row">
+        <div class="col-md-3 field-label">Diagnostic RunId <span class="required">*</span>
+          <fab-tooltip-host content="The ID of the run. It should be unique per Periscope deployment."
+            [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+            <img src="assets/img/info.svg" title="info" />
+          </fab-tooltip-host>
+        </div>
+        <div class="col-md-5 col-sm-4">
+          <input aria-required="true" placeholder="e.g., YYYY-DD-MMTHH:mm:SS" [(ngModel)]="diagnosticRunId">
+        </div>
+      </div> 
+
       <div class="mt-3 ml-3">
         <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() || isProcessingNewSession()" (onClick)="runInClusterPeriscope()">
           {{!isValidStorageConfig() || isProcessingNewSession() ? 'Submitting session to cluster' : 'Run Periscope in Cluster'  }}
@@ -135,8 +160,8 @@
                         <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
                         <span> Timeout retrieving runCommand status. The job might still be running</span>
                       </div>
-                      <div *ngIf="(session.status == sessionStatus.Finsihed)">
-                        <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
+                      <div *ngIf="session.status == sessionStatus.Finsihed">
+                        <i class="fa health-icon fa-times-circle" aria-hidden="true"></i>
                         <span> Completed</span>
                       </div>
                       <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="getPeriscopeLogs(session)">
