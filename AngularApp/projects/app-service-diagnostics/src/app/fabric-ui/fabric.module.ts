@@ -44,6 +44,7 @@ import { DiagosticSessionsPanelComponent } from './components/diagostic-sessions
 import { SharedModule } from '../shared/shared.module';
 import { CreateStorageAccountPanelComponent } from './components/create-storage-account-panel/create-storage-account-panel.component';
 import { CallstackPanelComponent } from './components/callstack-panel/callstack-panel.component';
+import { GenericCreateStorageAccountPanelComponent } from './components/generic-create-storage-account-panel/generic-create-storage-account-panel.component';
 
 
 @NgModule({
@@ -59,7 +60,8 @@ import { CallstackPanelComponent } from './components/callstack-panel/callstack-
         SearchMatchPipe,
         DiagosticSessionsPanelComponent,
         CreateStorageAccountPanelComponent,
-        CallstackPanelComponent
+        CallstackPanelComponent, 
+        GenericCreateStorageAccountPanelComponent,
     ],
     imports: [
         CommonModule,

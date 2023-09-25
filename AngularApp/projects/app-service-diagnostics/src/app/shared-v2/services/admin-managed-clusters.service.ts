@@ -12,13 +12,14 @@ import { ResourceDescriptor, StringUtilities } from "diagnostic-data";
 import { ArmService } from '../../shared/services/arm.service';
 
 import { CredentialResult, CredentialResults, KubeConfigCredentials, RunCommandRequest, RunCommandResult } from 'projects/diagnostic-data/src/lib/models/managed-cluster-rest';
-import { DiagnosticSettingsResource, ManagedCluster, ManagedClusterMetaInfo, PeriscopeConfig, StorageAccountConfig} from '../../shared/models/managed-cluster';
+import { DiagnosticSettingsResource, ManagedCluster,  PeriscopeConfig, StorageAccountConfig} from '../../shared/models/managed-cluster';
 import { AuthService } from '../../startup/services/auth.service';
 import { ResourceType, StartupInfo } from '../../shared/models/portal';
 import { ResponseMessageCollectionEnvelope, ResponseMessageEnvelope } from '../../shared/models/responsemessageenvelope';
 import { StorageService } from '../../shared/services/storage.service';
 import * as moment from 'moment';
 import { Moment } from 'moment';
+import { ArmResourceMetaInfo } from '../../shared/models/armObj';
 
 
 const RUN_COMMAND_INITIAL_POLL_WAIT_MS: number = 1000;
@@ -30,7 +31,7 @@ export class AdminManagedClustersService {
 
 
   public managedCluster: BehaviorSubject<ManagedCluster> = new BehaviorSubject<ManagedCluster>(null);
-  public currentClusterMetaInfo: BehaviorSubject<ManagedClusterMetaInfo> = new BehaviorSubject<ManagedClusterMetaInfo>(null);
+  public currentClusterMetaInfo: BehaviorSubject<ArmResourceMetaInfo> = new BehaviorSubject<ArmResourceMetaInfo>(null);
   public diagnosticSettingsApiVersion = "2021-05-01-preview";
   public RFC_3336: string = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
 
@@ -123,7 +124,7 @@ export class AdminManagedClustersService {
 
   private _populateManagedClusterMetaInfo(resourceId: string) {
     const pieces = resourceId.toLowerCase().split('/');
-    const managedClusterMetaInfo = <ManagedClusterMetaInfo>{
+    const managedClusterMetaInfo = <ArmResourceMetaInfo>{
         resourceUri: resourceId,
         subscriptionId: pieces[pieces.indexOf('subscriptions') + 1],
         resourceGroupName: pieces[pieces.indexOf('resourcegroups') + 1],

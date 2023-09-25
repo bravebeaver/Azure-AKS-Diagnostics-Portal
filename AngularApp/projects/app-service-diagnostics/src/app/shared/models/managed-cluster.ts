@@ -1,15 +1,9 @@
-export class ManagedClusterMetaInfo {
-    resourceUri: string;
-    subscriptionId: string;
-    resourceGroupName: string;
-    managedResourceGroupName: string;
-    name: string;
-    apiVersion: string;
-}
+import { ArmResourceMetaInfo } from "./armObj";
 
-export class ManagedCluster extends ManagedClusterMetaInfo {
+
+export class ManagedCluster extends ArmResourceMetaInfo {
     // identity: Identity;
-    location: string;
+    managedResourceGroupName: string;
     addonProfiles: any;
     agentPoolProfiles: AgentPoolProfile[];
     dnsPrefix: string;

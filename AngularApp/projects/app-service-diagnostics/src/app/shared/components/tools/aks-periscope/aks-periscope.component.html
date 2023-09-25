@@ -39,34 +39,31 @@
   <collapsible-list-fabric [collapsed]="false" title="Configure new Session">
     <!--configure periscope run-->
     <collapsible-list-item body>
-      <div class="row">
-        <div class="col-md-3 field-label"> Storage account <span class="required">*</span>
-          <fab-tooltip-host
+      <div>
+        <div class="row mt-4">
+          <div class="col-md-3 field-label">
+            Storage account <span class="required">*</span>
+            <fab-tooltip-host
             content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
             or an account with a shared access signature token"
             [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
             <img src="assets/img/info.svg" title="storage-account"/>
           </fab-tooltip-host>
-
-          <div class="col-md-5 col-sm-4">
-            <input aria-required="false" placeholder="storage account" [(ngModel)]="storageConfig.resourceName">
-            <!-- <a tabindex="0" aria-label="choose account" (onClick)="openSelectStorageAccountBlade()" > Choose </a> -->
-          </div>
-
-          <div class="col-md-4 col-sm-4">
-            <span style="color:red">*</span>
-            <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-              The storage account is required.
-            </div>
+        </div>
+        <div class="col-md-2">
+          <span> {{ storageConfig.resourceName }}
+          </span>
+          <div class="mt-1 mb-4" (click)="openSelectStorageAccountPanel()" (keyup.enter)="openSelectStorageAccountPanel()">
+            <a tabindex="0" role="button" name="Change storage account" aria-label="Change storage account">
+              {{storageConfig.resourceName != null && storageConfig.resourceName.length > 0  ? 'Change' : 'Select' }}</a>
           </div>
         </div>
       </div>
-
       <div class="row">
         <collapsible-list-fabric [collapsed]="false" title="Use Diagnostic Settings">
           <div header class="container">
             <div header class="summaryText">
-              Periscope can write logs to the storage account configured in the cluster diagnostic settings.
+              Periscope can use storage account configured in cluster diagnostic settings.
             </div>
           </div>
           <collapsible-list-item body>          
@@ -94,16 +91,17 @@
       
       <div class="row">
         <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
-          <fab-tooltip-host content="The blob container to store the logs of Periscope."
+          <fab-tooltip-host content="The blob container to store the logs of Periscope. If the container does not exist, it will be created."
             [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
             <img src="assets/img/info.svg" title="info" />
           </fab-tooltip-host>
         </div>
         <div class="col-md-5 col-sm-4">
           <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
-          <span style="color:red">*</span>
-          <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-            The container will be created if not exist already.
+ 
+          <div class="mt-1 mb-4" (click)="openSelectBlobContainerPanel()" (keyup.enter)="openSelectBlobContainerPanel()">
+            <a tabindex="0" role="button" name="Change blob container" aria-label="Change blob container">
+              {{containerName != null && containerName.length > 0  ? 'Change' : 'Select' }}</a>
           </div>
         </div>
       </div>  
@@ -125,6 +123,7 @@
           {{!isValidStorageConfig() || isProcessingNewSession() ? 'Submitting session to cluster' : 'Run Periscope in Cluster'  }}
         </fab-primary-button>
       </div>
+    </div>
     </collapsible-list-item>
   </collapsible-list-fabric>
 
@@ -164,12 +163,12 @@
                         <i class="fa health-icon fa-times-circle" aria-hidden="true"></i>
                         <span> Completed</span>
                       </div>
-                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="getPeriscopeLogs(session)">
+                      <div *ngIf="(session.status == sessionStatus.Abandoned || session.status == sessionStatus.Finished)" (click)="getPeriscopeLogs(session)">
                         <a tabindex="0" aria-label="view logs"> Get logs </a> 
                       </div>
                     </td>
                     <td>
-                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
+                      <div *ngIf="(session.status == sessionStatus.Abandoned || session.status == sessionStatus.Finished || session.status == sessionStatus.Error)" (click)="openStorageContainerBlade(session)">
                         <a tabindex="0" aria-label="view result">{{ session.config.containerName }} </a>
                       </div>
                     </td>
@@ -203,4 +202,5 @@
     </collapsible-list-item>
   
   </collapsible-list-fabric>
+
 </div>
