@@ -47,6 +47,11 @@ export class AksPeriscopeComponent implements OnInit {
   toolMessages : string[] = ['Loading...'];
   clusterMessages: string[] = [];
 
+  shareWithAKSExitConfirmationHidden: boolean = true;
+  expirySettings = [{displayName: '30 min, should be long enough for 1 complete run', value:''}, 
+  {displayName: '1 day, ideal for troubleshooting cluster issues with other diagnotistic tools', value:''}, 
+  {displayName: '1 momth, retained for longer term to compare with other periscope sessions', value:''}]
+
   private RUN_COMMAND_RESULT_POLL_WAIT_MS : number = 30000;
   
   ngOnInit() {
@@ -185,7 +190,7 @@ export class AksPeriscopeComponent implements OnInit {
     periscopeRunCommandState.subscribe(() => this.getPeriscopeLogs(session));
     
     periscopeRunCommandState.connect();
-}
+  }
 
   getPeriscopeLogs(session: PeriscopeSession) {
     this.clusterMessages = [];
@@ -204,6 +209,15 @@ export class AksPeriscopeComponent implements OnInit {
     );
   }
 
+  sharePeriscopeSessionWithAKS(session: PeriscopeSession) {
+    this.telemetryService.logEvent("OpenSharePeriscopeResultPanel");
+    this.telemetryService.logPageView("PeriscopeShareResultView");
+  }
+
+  showExitConfirmationDialog = (show: boolean = true) => {
+    this.shareWithAKSExitConfirmationHidden = !show;
+  }
+
 
   openStorageContainerBlade(session: PeriscopeSession) {
     this.telemetryService.logEvent("OpenPeriscopeResultPanel");
@@ -218,6 +232,10 @@ export class AksPeriscopeComponent implements OnInit {
       }
     };
     this._portalService.openBlade(bladeInfo, 'troubleshoot');
+  }
+
+  shareDiagnosticResultWithAKS() {
+    console.log("share your logs away!");
   }
 
   openSelectStorageAccountBlade() {

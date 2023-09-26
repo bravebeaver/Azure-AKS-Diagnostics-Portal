@@ -117,6 +117,7 @@ import { FabContextualMenuModule } from '@angular-react/fabric/lib/components/co
 import { FabTextFieldModule } from '@angular-react/fabric/lib/components/text-field';
 import { FabSpinButtonModule } from '@angular-react/fabric/lib/components/spin-button';
 import { FabGroupModule } from '@angular-react/fabric/lib/components/group';
+import { FabDialogModule } from '@angular-react/fabric/lib/components/dialog';
 import { FabSearchBoxModule } from '@angular-react/fabric/lib/components/search-box';
 import { FabSliderModule } from '@angular-react/fabric/lib/components/slider';
 import { FabTooltipModule } from '@angular-react/fabric/lib/components/tooltip';
@@ -236,6 +237,7 @@ import { AdminManagedClustersService } from '../shared-v2/services/admin-managed
         FabSpinButtonModule,
         FabTextFieldModule,
         FabContextualMenuModule,
+        FabDialogModule,
         MarkdownModule.forRoot({
             sanitize: SecurityContext.STYLE
         })

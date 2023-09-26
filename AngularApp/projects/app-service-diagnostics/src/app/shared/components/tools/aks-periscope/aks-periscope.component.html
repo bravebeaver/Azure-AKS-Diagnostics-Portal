@@ -144,36 +144,44 @@
                     <th tabindex="0">Runtime/ Diagnostic Id</th>
                     <th tabindex="0">Running Status</th>
                     <th tabindex="0">View in Blob Container</th>
-                    <th tabindex="0">Open in Storage Explorer</th>
+                    <th tabindex="0">Share With AKS
+                      <fab-tooltip-host content="You can share with session result with AKS by generating a SAS token. You can specify an expiry date for the SAS token."
+                      [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+                      <img src="assets/img/info.svg" title="info" />
+                    </fab-tooltip-host>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr *ngFor="let session of periscopeSessions">
                     <td tabindex="0"> {{ session.config.diagnosticRunId }} </td>
                     <td>
-                      <div *ngIf="session.status == sessionStatus.Running">
+                      <div *ngIf="session.status === sessionStatus.Running">
                         <i class="fa fa-spinner fa-spin"></i> Running...
                       </div>
-                      <div *ngIf="(session.status == sessionStatus.Error)">
+                      <div *ngIf="(session.status === sessionStatus.Error)">
                         <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
                         <span> Timeout retrieving runCommand status. The job might still be running</span>
                       </div>
-                      <div *ngIf="session.status == sessionStatus.Finsihed">
+                      <div *ngIf="session.status === sessionStatus.Finsihed">
                         <i class="fa health-icon fa-times-circle" aria-hidden="true"></i>
                         <span> Completed</span>
                       </div>
-                      <div *ngIf="(session.status == sessionStatus.Error || session.status == sessionStatus.Finished)" (click)="getPeriscopeLogs(session)">
+                      <div *ngIf="(session.status === sessionStatus.Error || session.status === sessionStatus.Finished)" (click)="getPeriscopeLogs(session)">
                         <a tabindex="0" aria-label="view logs"> Get logs </a> 
                       </div>
                     </td>
                     <td>
-                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
+                      <div *ngIf="(session.status !== sessionStatus.Running && session.status !== sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
                         <a tabindex="0" aria-label="view result">{{ session.config.containerName }} </a>
                       </div>
                     </td>
                     <td>
-                      <div *ngIf="session.status == sessionStatus.Finished">
-                        <a tabindex="0" aria-label="view result" [href]="session.resultHref"> Copy Link </a>
+                      <div class="col-md-3" *ngIf="session.status === sessionStatus.Finished">
+                        <select class="form-select form-select-sm ml-2" title="SAS Expiry" [(ngModel)]="session.sasExpiry">
+                          <option *ngFor="let expiry of expirySettings" [ngValue]="expiry.value" > {{ expiry.displayName }}</option>
+                        </select>
+                        <a tabindex="0" aria-label="share with AKS" (click)="sharePeriscopeSessionWithAKS(session)"> Send </a>
                       </div>
                     </td>
                   </tr>
@@ -186,7 +194,7 @@
     </collapsible-list-item>
   </collapsible-list-fabric>
 
-  <collapsible-list-fabric [collapsed]="clusterMessages.length == 0" title="Logs and Outputs">
+  <collapsible-list-fabric [collapsed]="clusterMessages.length === 0" title="Logs and Outputs">
     <collapsible-list-item body>
       <div class="container">
         <div class="col-md-9 ">
