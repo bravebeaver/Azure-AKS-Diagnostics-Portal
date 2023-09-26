@@ -23,10 +23,10 @@
   </p>
 
   <div style="margin-top:10px;margin-bottom: 5px">
-    <div *ngIf="status == toolStatus.Loading">
+    <div *ngIf="status === toolStatus.Loading">
       <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true">Running </i>
     </div>
-    <div *ngIf=" status == toolStatus.Error">
+    <div *ngIf=" status === toolStatus.Error">
       <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true">Error</i>
     </div>
     <div>
@@ -40,44 +40,46 @@
     <!--configure periscope run-->
     <collapsible-list-item body>
       <div class="row">
-        <div class="col-md-3 field-label"> Storage account <span class="required">*</span>
+        <div class="col-md-3 field-label"> Storage account Name<span class="required">*</span>
           <fab-tooltip-host
             content="The selected storage account will store the logs captured via AKS periscope. You can choose to use a storage account resource you own, 
             or an account with a shared access signature token"
             [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
             <img src="assets/img/info.svg" title="storage-account"/>
           </fab-tooltip-host>
+        </div>
 
-          <div class="col-md-5 col-sm-4">
-            <input aria-required="false" placeholder="storage account" [(ngModel)]="storageConfig.resourceName">
-            <!-- <a tabindex="0" aria-label="choose account" (onClick)="openSelectStorageAccountBlade()" > Choose </a> -->
-          </div>
-
-          <div class="col-md-4 col-sm-4">
-            <span style="color:red">*</span>
-            <div *ngIf="storageConfig.resourceName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-              The storage account is required.
-            </div>
-          </div>
+        <div class="col-md-5">
+          <span>{{ storageConfig.resourceName }}</span>
+          <!-- <a tabindex="0" aria-label="choose account" (onClick)="openSelectStorageAccountBlade()" > Choose </a> -->
         </div>
       </div>
 
       <div class="row">
-        <collapsible-list-fabric [collapsed]="false" title="Use Diagnostic Settings">
-          <div header class="container">
-            <div header class="summaryText">
-              Periscope can write logs to the storage account configured in the cluster diagnostic settings.
-            </div>
+        <div class="col-md-3 field-label">
+          <label for="chooseDiagSettings">Use Diagnostic Settings</label>
+        </div>     
+        <div class="col-md-5 col-sm-4" *ngIf="diagnosticSettings.length > 0; else noDiagSettings">
+          <select  class="form-control form-control-sm"  id="chooseDiagSettings"  (change)="onDiagSettingSelectionChange()" [(ngModel)]="diagnosticSettingSelected">
+            <option *ngFor="let diagSetting of diagnosticSettings" [ngValue]="diagSetting" > {{ diagSetting.name }}</option>
+          </select>
+        </div>
+        <ng-template #noDiagSettings> 
+          <div class="col-md-5 col-sm-4">
+            <span>No existing diagnostic settings.</span> 
+            <a tabindex="0" aria-label="create new settings" (onClick)="openCreateDiagnosticSettingsBlade()"> Create new </a>
           </div>
-          <collapsible-list-item body>          
-            <div *ngIf="diagnosticSettings.length > 0">
-              <label for="chooseDiagSettings">Choose Diagnostic Settings</label>
-              <select id="chooseDiagSettings" class="ml-4"  (change)="onDiagSettingSelectionChange($event.target)" [(ngModel)]="diagnosticSettingSelected">
-                <option *ngFor="let diagSetting of diagnosticSettings" [ngValue]="diagSetting" > {{ diagSetting.name }}</option>
-              </select>
-            </div>
-          </collapsible-list-item>
-        </collapsible-list-fabric>
+        </ng-template>
+      </div>
+
+      <div class="row">
+        <div class="col-md-3 field-label">
+          <label for="chooseStorageAccount">Choose Storage Account</label>
+        </div>
+        <div class="col-md-5 col-sm-4">
+          <input id="chooseStorageAccount" class="form-control form-control-sm"  aria-required="false" placeholder="storage account resourceId" (change)="onStorageAccountResourceUriChange($event.target.value)" [(ngModel)]="storageAccountUri">
+          <a tabindex="0" aria-label="choose storage account"> Create or Choose </a>
+        </div>
       </div>
 
       <div class="row">
@@ -88,23 +90,19 @@
           </fab-tooltip-host>
         </div>
         <div class="col-md-5 col-sm-4">
-          <input aria-required="false" placeholder="sas token" [(ngModel)]="storageConfig.accountSasToken">
+          <input type="text"  class="form-control form-control-sm"  aria-required="false" placeholder="sas token" [(ngModel)]="storageConfig.accountSasToken">
         </div>
       </div>
       
       <div class="row">
         <div class="col-md-3 field-label"> Container Name <span class="required">*</span>
-          <fab-tooltip-host content="The blob container to store the logs of Periscope."
+          <fab-tooltip-host content="The blob container to store the logs of Periscope.  The container will be created if not exists."
             [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
             <img src="assets/img/info.svg" title="info" />
           </fab-tooltip-host>
         </div>
         <div class="col-md-5 col-sm-4">
-          <input aria-required="true" placeholder="blob container name" [(ngModel)]="containerName">
-          <span style="color:red">*</span>
-          <div *ngIf="containerName !== null && !isValidStorageConfig()" class="alert alert-danger" role="alert" style="margin-top:5px">
-            The container will be created if not exist already.
-          </div>
+          <input aria-required="true" class="form-control form-control-sm"  placeholder="blob container name" [(ngModel)]="containerName">
         </div>
       </div>  
         
@@ -116,7 +114,7 @@
           </fab-tooltip-host>
         </div>
         <div class="col-md-5 col-sm-4">
-          <input aria-required="true" placeholder="e.g., YYYY-DD-MMTHH:mm:SS" [(ngModel)]="diagnosticRunId">
+          <input aria-required="true" class="form-control form-control-sm"  placeholder="e.g., YYYY-DD-MMTHH:mm:SS" [(ngModel)]="diagnosticRunId">
         </div>
       </div> 
 

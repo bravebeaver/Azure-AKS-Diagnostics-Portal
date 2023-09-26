@@ -26,15 +26,18 @@ export class AksPeriscopeComponent implements OnInit {
     private telemetryService: TelemetryService) {
   }
 
-  @Input() storageConfig: StorageAccountConfig = new StorageAccountConfig();
+  storageAccountUri: string;
+  containerName: string;
+  diagnosticRunId: string;
 
-  @Input() containerName: string;
-  @Input() diagnosticRunId: string;
-  @Input() windowsTag: string = "0.0.13";
-  @Input() linuxTag: string = "0.0.13";
-
-  diagnosticSettings: DiagnosticSettingsResource[];
+  diagnosticSettings: DiagnosticSettingsResource[] = [new DiagnosticSettingsResource()];
   diagnosticSettingSelected: DiagnosticSettingsResource;
+
+  storageConfig: StorageAccountConfig = new StorageAccountConfig();
+  windowsTag: string = "0.0.13";
+  linuxTag: string = "0.0.13";
+
+  periscopeSessions: PeriscopeSession[] = [];
   
   //UI stuff
   status: ToolStatus = ToolStatus.Loading;
@@ -44,12 +47,7 @@ export class AksPeriscopeComponent implements OnInit {
   toolMessages : string[] = ['Loading...'];
   clusterMessages: string[] = [];
 
-  periscopeSessions: PeriscopeSession[] = [];
-  currentCluster: ManagedCluster;
-
   private RUN_COMMAND_RESULT_POLL_WAIT_MS : number = 30000;
-  
-
   
   ngOnInit() {
     this._adminManagedCluster.managedCluster.subscribe((managedCluster: ManagedCluster )=> {
@@ -58,25 +56,38 @@ export class AksPeriscopeComponent implements OnInit {
         this.updateToolMessages("No cluster selected", ToolStatus.Error);
         return;
       }
-      this.currentCluster = managedCluster;
       this.updateToolMessages("Cluster loaded", ToolStatus.Loaded);
       
       this.containerName = `periscope-${managedCluster.name}`;
       if (!!managedCluster.diagnosticSettings && managedCluster.diagnosticSettings.length > 0) {
         //TODO which one to use? get drop down from UI and ask user to choose.
-        this.diagnosticSettings = managedCluster.diagnosticSettings;
+        this.diagnosticSettings.push(...managedCluster.diagnosticSettings);
         this.diagnosticSettingSelected = this.diagnosticSettings[0];
-        this.onDiagSettingSelectionChange();
+        // this.onStorageAccountResourceUriChange(this.diagnosticSettingSelected.properties.storageAccountId);
       } 
       this.resetSessionConfig();
     });
   }
 
   onDiagSettingSelectionChange() {
-    this._adminManagedCluster.populateStorageAccountConfigById(this.diagnosticSettingSelected.properties.storageAccountId).subscribe(
+    if (!!this.diagnosticSettingSelected.properties.storageAccountId) {
+      this.onStorageAccountResourceUriChange(this.diagnosticSettingSelected.properties.storageAccountId);
+    } else {
+      this.storageConfig = new StorageAccountConfig();
+    }
+  }
+  onStorageAccountResourceUriChange(storageAccountResourceUri: string) {
+    if (!storageAccountResourceUri) {
+      this.storageConfig = new StorageAccountConfig();
+      return;
+    }
+    this._adminManagedCluster.populateStorageAccountConfigById(storageAccountResourceUri).subscribe(
       (config: StorageAccountConfig) => {
         if (!!config) {
           this.storageConfig = config;
+          if (this.storageConfig.resourceUri != this.diagnosticSettingSelected.properties.storageAccountId) {
+            this.diagnosticSettingSelected = this.diagnosticSettings[0];
+          }
         } else {
           this.storageConfig = new StorageAccountConfig();
           this.updateToolMessages("Invalid storage account", ToolStatus.Error);
@@ -222,34 +233,6 @@ export class AksPeriscopeComponent implements OnInit {
         }
       };
       this._portalService.openBlade(bladeInfo, 'troubleshoot');
-  }
-
-  openNewDiagnosticSettingBlade() {
-    this.telemetryService.logEvent("OpenCreateDiagnosticSettingPanel");
-    this.telemetryService.logPageView("CreateDiagnosticSettingPeriscopeView");
-
-    // const bladeInfo = {
-    //   detailBlade: 'StorageAccountSelectorBlade',
-    //   extension: 'Microsoft_Azure_Monitoring',
-    //   detailBladeInputs: {
-    //     // storageAccountId: session.config.storage.resourceUri,
-    //     // path: session.config.containerName
-    //     resourceId: this.currentCluster.resourceUri,
-    //   }
-    // };
-    // this._portalService.openBlade(bladeInfo, 'troubleshoot');
-    
-
-  const bladeInfo = {
-      detailBlade: 'StorageAccountSelectorBlade',
-      extension: 'Microsoft_Azure_Monitoring',
-      detailBladeInputs:  {
-        resourceId: this.currentCluster.resourceUri
-    },
-  };
-
-  this._portalService.openBlade(bladeInfo, 'troubleshoot');
-
   }
 
   updateToolMessages(arg: string|string[], status: ToolStatus) {
