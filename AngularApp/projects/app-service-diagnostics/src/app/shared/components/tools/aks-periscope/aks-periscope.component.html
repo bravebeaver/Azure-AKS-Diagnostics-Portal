@@ -156,7 +156,7 @@
                       <div *ngIf="session.status == sessionStatus.Running">
                         <i class="fa fa-spinner fa-spin"></i> Running...
                       </div>
-                      <div *ngIf="(session.status == sessionStatus.Error || session.status == sessionStatus.Abandoned)">
+                      <div *ngIf="(session.status == sessionStatus.Error)">
                         <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
                         <span> Timeout retrieving runCommand status. The job might still be running</span>
                       </div>
@@ -164,7 +164,7 @@
                         <i class="fa health-icon fa-times-circle" aria-hidden="true"></i>
                         <span> Completed</span>
                       </div>
-                      <div *ngIf="(session.status != sessionStatus.Running && session.status != sessionStatus.Created)" (click)="getPeriscopeLogs(session)">
+                      <div *ngIf="(session.status == sessionStatus.Error || session.status == sessionStatus.Finished)" (click)="getPeriscopeLogs(session)">
                         <a tabindex="0" aria-label="view logs"> Get logs </a> 
                       </div>
                     </td>
@@ -174,7 +174,7 @@
                       </div>
                     </td>
                     <td>
-                      <div *ngIf="session.status == sessionStatus.Finished || session.status == sessionStatus.Abandoned ">
+                      <div *ngIf="session.status == sessionStatus.Finished">
                         <a tabindex="0" aria-label="view result" [href]="session.resultHref"> Copy Link </a>
                       </div>
                     </td>

@@ -105,16 +105,13 @@ export class AdminManagedClustersService {
     return `https://${periscopeConfig.storage.resourceName}.blob.core.windows.net/${periscopeConfig.containerName}?${params}`;
   }
 
-
-  populateStorageAccountConfig(diagnosticSetting: DiagnosticSettingsResource): Observable<StorageAccountConfig> {
-    const resourceUri = diagnosticSetting.properties.storageAccountId;
-        
-    return this._storageService.generateSasKey(resourceUri, '').pipe(
+  populateStorageAccountConfigById(storageAccountUri: string): Observable<StorageAccountConfig> {        
+    return this._storageService.generateSasKey(storageAccountUri, '').pipe(
       map((sasKey: string) => {
-        const storageAccountDesc = ResourceDescriptor.parseResourceUri(resourceUri);
+        const storageAccountDesc = ResourceDescriptor.parseResourceUri(storageAccountUri);
         return <StorageAccountConfig>{
           accountSasToken: sasKey,  
-          resourceUri: resourceUri, 
+          resourceUri: storageAccountUri, 
           resourceName: storageAccountDesc.resource, 
           subscriptionId: storageAccountDesc.subscription
         };

@@ -1,7 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
-import { catchError, delay, publish, switchMap, tap, timeout } from 'rxjs/operators';
-import { Observable,  fromEvent, throwError } from 'rxjs';
+import {  publish, switchMap} from 'rxjs/operators';
 
 import { DirectionalHint } from 'office-ui-fabric-react/lib/Tooltip';
 import * as moment from 'moment';
@@ -74,12 +73,14 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   onDiagSettingSelectionChange() {
-    this._adminManagedCluster.populateStorageAccountConfig(this.diagnosticSettingSelected).subscribe((config: StorageAccountConfig) => {
-      if (!!config) {
-        this.storageConfig = config;
-      } else {
-        this.storageConfig = new StorageAccountConfig()
-      }
+    this._adminManagedCluster.populateStorageAccountConfigById(this.diagnosticSettingSelected.properties.storageAccountId).subscribe(
+      (config: StorageAccountConfig) => {
+        if (!!config) {
+          this.storageConfig = config;
+        } else {
+          this.storageConfig = new StorageAccountConfig();
+          this.updateToolMessages("Invalid storage account", ToolStatus.Error);
+        }
     });
   }
 
@@ -131,18 +132,19 @@ export class AksPeriscopeComponent implements OnInit {
   toggleStorageAccountPanel() {
     this.telemetryService.logEvent("OpenCreateStorageAccountPanel");
     this.telemetryService.logPageView("CreateStorageAccountPanelView");
-
   }
 
   processNewSession(session: PeriscopeSession) {
+    //take a deep copy to start the session to avoid UI messup
     this.periscopeSessions.push(session);
 
+    this.diagnosticRunId = moment().format('YYYY-MM-DDTHH:mm:ss');
     const periscopeRunCommandState = publish()(this._adminManagedCluster.runCommandPeriscope(session.config));
     session.status = SessionStatus.Running; 
     // just in case the run command result is not available, we will poll the blob container for the result
     setTimeout(() => {
       if (session.status === SessionStatus.Running) {
-        session.status = SessionStatus.Abandoned; 
+        session.status = SessionStatus.Error; 
       }}, this.RUN_COMMAND_RESULT_POLL_WAIT_MS);
     
     periscopeRunCommandState.subscribe(
@@ -165,7 +167,7 @@ export class AksPeriscopeComponent implements OnInit {
       (runCommandResult: RunCommandResult) => this.clusterMessages.push(...runCommandResult.properties.logs.split('\n')),
       (error: any) => {
         this.clusterMessages.push(...[`Error retrieving run Periscope result - ${error}.`, ` The cluster might still process it.`]);
-        session.status = SessionStatus.Abandoned;     
+        session.status = SessionStatus.Error;     
       }
     );
 
@@ -180,12 +182,8 @@ export class AksPeriscopeComponent implements OnInit {
     this.clusterMessages.push(`Retrieving periscope logs, it might serveral minutes depending on the size of cluster`); 
     this._adminManagedCluster.pollPeriscopeLogs(moment.utc(session.startAt)).subscribe(
       (periscopeLogs: string[]) => {
-        if (!periscopeLogs || periscopeLogs.length == 0) {
-          this.clusterMessages.push(`No logs received yet. keep trying...`);
-        } else {
-          this.clusterMessages.push(...periscopeLogs);
-          session.status = SessionStatus.Finished;
-        }
+        this.clusterMessages.push(...periscopeLogs);
+        session.status = SessionStatus.Finished;
       },
       (error: any) => {
         session.status = SessionStatus.Error;
@@ -295,7 +293,7 @@ export enum SessionStatus {
   Running, // when the session is running 
   Error, // when there is any error during the session, can be timeout or failure to connect to cluster
   Finished, // when the actual workload is completed on the cluster
-  Abandoned, // error getting logs, or any other unknown error
+  // Abandoned, // error getting logs, or any other unknown error
 }
 
 export interface PeriscopeSession {
