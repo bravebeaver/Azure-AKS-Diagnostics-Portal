@@ -59,7 +59,7 @@ export class AdminManagedClustersService {
           adminToken: adminCredential.kubeconfig.users[0].user.token
         };
 
-        // the cluster may or may not have diagnostics;
+        // the cluster may or may not have diagnostic settings;
         return this.getResourceDiagnosticSettings(currentCluster.resourceUri).pipe(
           mergeMap((diagnosticSettings: DiagnosticSettingsResource[]) => {
             currentCluster.diagnosticSettings = diagnosticSettings;
@@ -133,18 +133,14 @@ export class AdminManagedClustersService {
   //POST https://management.azure.com/${resourceUri}/runCommand?api-version=2023-07-01
   private runCommandInCluster(command: string, context?: string): Observable<RunCommandResult> {
     console.log(`runCommand ${command} in cluster`);
-      return this.managedCluster.pipe(
-        switchMap( (privateManagedCluter : ManagedCluster) => {
-          const commandRequest: RunCommandRequest = {
-            command: command,
-            clusterToken: privateManagedCluter.adminToken,
-            context: context || ""
-          };
+      
+    const commandRequest: RunCommandRequest = {
+      command: command,
+      clusterToken: this.managedCluster.value.adminToken,
+      context: context || ""
+    };
 
-        return this._armClient.postResourceFullResponse<RunCommandResult>(
-        `${privateManagedCluter.resourceUri}/${ManagedClusterCommandApi.RUN_COMMAND}`, commandRequest, true);
-      })
-    ).pipe(
+    return this._armClient.postResourceFullResponse<RunCommandResult>(`${this.managedCluster.value.resourceUri}/${ManagedClusterCommandApi.RUN_COMMAND}`, commandRequest, true).pipe(
       map((runCommandJobResult: HttpResponse<RunCommandResult>) => {
         if (runCommandJobResult.status === 202) {
           const location= runCommandJobResult.headers.get("Location");

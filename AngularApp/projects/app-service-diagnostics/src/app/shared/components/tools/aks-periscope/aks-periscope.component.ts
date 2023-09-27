@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { ITooltipOptions } from '@angular-react/fabric/lib/components/tooltip';
 import {  publish, switchMap} from 'rxjs/operators';
 
@@ -10,8 +10,6 @@ import { AdminManagedClustersService } from '../../../../shared-v2/services/admi
 import {  PeriscopeConfig, ManagedCluster, StorageAccountConfig, DiagnosticSettingsResource } from '../../../models/managed-cluster';
 import { TelemetryService } from 'diagnostic-data';
 import { PortalService } from 'projects/app-service-diagnostics/src/app/startup/services/portal.service';
-import { PortalActionService } from '../../../services/portal-action.service';
-
 
 @Component({
   selector: 'aks-periscope',
@@ -42,16 +40,20 @@ export class AksPeriscopeComponent implements OnInit {
   //UI stuff
   status: ToolStatus = ToolStatus.Loading;
   toolStatus = ToolStatus;
+
   sessionStatus = SessionStatus;
 
   toolMessages : string[] = ['Loading...'];
   clusterMessages: string[] = [];
 
-  shareWithAKSExitConfirmationHidden: boolean = true;
-  expirySettings = [{displayName: '30 min, should be long enough for 1 complete run', value:''}, 
-  {displayName: '1 day, ideal for troubleshooting cluster issues with other diagnotistic tools', value:''}, 
-  {displayName: '1 momth, retained for longer term to compare with other periscope sessions', value:''}]
+  sharingExpiryOptions = Object.entries(SessionSharingExpiryOptions).filter(([key, value]) => !isNaN(Number(key)));
 
+  sharingExpiryOptionsToolTips: string[] = [
+    '30 min. Ideal for single, isolated troubleshooting session', 
+    '1 day. Ideal for troubleshooting cluster issues with other diagnotistic tools', 
+    '30 days. Ideal for cross-checking changes of cluster configuration over time', 
+    'Indefinite storage. Ideal to correlate with all other metrics and diagnostic settings for the cluster while the lifecycle of the logs are managed elsewhere.'
+  ];
   private RUN_COMMAND_RESULT_POLL_WAIT_MS : number = 30000;
   
   ngOnInit() {
@@ -71,11 +73,12 @@ export class AksPeriscopeComponent implements OnInit {
         // this.onStorageAccountResourceUriChange(this.diagnosticSettingSelected.properties.storageAccountId);
       } 
       this.resetSessionConfig();
-    });
+    }); 
+      
   }
 
   onDiagSettingSelectionChange() {
-    if (!!this.diagnosticSettingSelected.properties.storageAccountId) {
+    if (!!this.diagnosticSettingSelected.properties && !!this.diagnosticSettingSelected.properties.storageAccountId) {
       this.onStorageAccountResourceUriChange(this.diagnosticSettingSelected.properties.storageAccountId);
     } else {
       this.storageConfig = new StorageAccountConfig();
@@ -165,10 +168,7 @@ export class AksPeriscopeComponent implements OnInit {
     
     periscopeRunCommandState.subscribe(
       (submitCommandResult: RunCommandResult) => {
-        this.clusterMessages.push(`Command submitted with ID - ${submitCommandResult.id}`);
-
-        const blobUrl = this._adminManagedCluster.pollPeriscopeBlobResult(session.config)
-        session.resultHref = blobUrl; // if periscope ever runs, it should store its output with this blob url
+        this.clusterMessages.push(`Command submitted with ID - ${submitCommandResult.id}`); // if periscope ever runs, it should store its output with this blob url
       }, 
       (error: any) => {
         this.clusterMessages.push(`Error submitting runCommand - ${error}`);
@@ -212,12 +212,8 @@ export class AksPeriscopeComponent implements OnInit {
   sharePeriscopeSessionWithAKS(session: PeriscopeSession) {
     this.telemetryService.logEvent("OpenSharePeriscopeResultPanel");
     this.telemetryService.logPageView("PeriscopeShareResultView");
+    console.log(`sharing with aks ${JSON.stringify(session)}`);
   }
-
-  showExitConfirmationDialog = (show: boolean = true) => {
-    this.shareWithAKSExitConfirmationHidden = !show;
-  }
-
 
   openStorageContainerBlade(session: PeriscopeSession) {
     this.telemetryService.logEvent("OpenPeriscopeResultPanel");
@@ -234,8 +230,10 @@ export class AksPeriscopeComponent implements OnInit {
     this._portalService.openBlade(bladeInfo, 'troubleshoot');
   }
 
-  shareDiagnosticResultWithAKS() {
-    console.log("share your logs away!");
+  shareDiagnosticResultWithAKS(session: PeriscopeSession) {
+    const blobUrl = this._adminManagedCluster.pollPeriscopeBlobResult(session.config)
+    console.log(`share your logs away! ${blobUrl}`);
+   
   }
 
   openSelectStorageAccountBlade() {
@@ -254,8 +252,8 @@ export class AksPeriscopeComponent implements OnInit {
   }
 
   updateToolMessages(arg: string|string[], status: ToolStatus) {
-    // reset status message if we are not in error state
-    if (  this.status == ToolStatus.Error && status != ToolStatus.Error) {
+    // reset status message if we toggle error state
+    if ( (status === ToolStatus.Error ||this.status === ToolStatus.Error) && status != this.status) {
       this.toolMessages = [];
     }
     this.status = status;
@@ -294,12 +292,18 @@ export enum SessionStatus {
   Running, // when the session is running 
   Error, // when there is any error during the session, can be timeout or failure to connect to cluster
   Finished, // when the actual workload is completed on the cluster
-  // Abandoned, // error getting logs, or any other unknown error
+}
+
+export enum SessionSharingExpiryOptions {
+  Short = 0, // 30 min
+  Medium = 1, // 1 day
+  Long = 2, // 1 month
+  Indefinite = 3, // 3 months or more
 }
 
 export interface PeriscopeSession {
   config: PeriscopeConfig, 
   status: SessionStatus, 
   startAt: Date,
-  resultHref?: string;
+  sharingConfig: SessionSharingExpiryOptions,
 }

@@ -17,12 +17,8 @@
     <span style="margin-top:5px"><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview">Learn more</a></span>
   </p>
   
-  <p>
-    Read our data privacy statement here.
-    <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">Learn more</a>
-  </p>
 
-  <div style="margin-top:10px;margin-bottom: 5px">
+  <div style="margin-top:10px;margin-bottom: 5px"> {{ status}}
     <div *ngIf="status === toolStatus.Loading">
       <i class="fa fa-circle-o-notch fa-spin spin-icon" aria-hidden="true">Running </i>
     </div>
@@ -120,7 +116,7 @@
 
       <div class="mt-3 ml-3">
         <fab-primary-button [contentStyle]="'margin-right:10px;float:left'" [disabled]="!isValidStorageConfig() || isProcessingNewSession()" (onClick)="runInClusterPeriscope()">
-          {{!isValidStorageConfig() || isProcessingNewSession() ? 'Submitting session to cluster' : 'Run Periscope in Cluster'  }}
+          {{ isProcessingNewSession() ? 'Submitting request to cluster' : 'Run Periscope in Cluster'  }}
         </fab-primary-button>
       </div>
     </collapsible-list-item>
@@ -129,66 +125,91 @@
   <collapsible-list-fabric [collapsed]="periscopeSessions.length === 0" title="Historical Sessions">
     <collapsible-list-item body>
       <div class="container">
-        <div class="row">
-          <div class="col-md-9">
-            <div *ngIf="periscopeSessions.length === 0 else toolSessions">
-              <fab-tooltip-host content="Only sessions available to AKS are displayed here" [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                No known sessions.
-              </fab-tooltip-host>
-            </div>
-
-            <ng-template #toolSessions>
-              <table class="table table-borderless">
-                <thead>
-                  <tr>
-                    <th tabindex="0">Runtime/ Diagnostic Id</th>
-                    <th tabindex="0">Running Status</th>
-                    <th tabindex="0">View in Blob Container</th>
-                    <th tabindex="0">Share With AKS
-                      <fab-tooltip-host content="You can share with session result with AKS by generating a SAS token. You can specify an expiry date for the SAS token."
-                      [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
-                      <img src="assets/img/info.svg" title="info" />
-                    </fab-tooltip-host>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let session of periscopeSessions">
-                    <td tabindex="0"> {{ session.config.diagnosticRunId }} </td>
-                    <td>
-                      <div *ngIf="session.status === sessionStatus.Running">
-                        <i class="fa fa-spinner fa-spin"></i> Running...
-                      </div>
-                      <div *ngIf="(session.status === sessionStatus.Error)">
-                        <i class="fa health-icon fa-times-circle unhealthy-icon-color" aria-hidden="true"></i>
-                        <span> Timeout retrieving runCommand status. The job might still be running</span>
-                      </div>
-                      <div *ngIf="session.status === sessionStatus.Finsihed">
-                        <i class="fa health-icon fa-times-circle" aria-hidden="true"></i>
-                        <span> Completed</span>
-                      </div>
-                      <div *ngIf="(session.status === sessionStatus.Error || session.status === sessionStatus.Finished)" (click)="getPeriscopeLogs(session)">
-                        <a tabindex="0" aria-label="view logs"> Get logs </a> 
-                      </div>
-                    </td>
-                    <td>
-                      <div *ngIf="(session.status !== sessionStatus.Running && session.status !== sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
-                        <a tabindex="0" aria-label="view result">{{ session.config.containerName }} </a>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="col-md-3" *ngIf="session.status === sessionStatus.Finished">
-                        <select class="form-select form-select-sm ml-2" title="SAS Expiry" [(ngModel)]="session.sasExpiry">
-                          <option *ngFor="let expiry of expirySettings" [ngValue]="expiry.value" > {{ expiry.displayName }}</option>
-                        </select>
-                        <a tabindex="0" aria-label="share with AKS" (click)="sharePeriscopeSessionWithAKS(session)"> Send </a>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </ng-template>
+        <div *ngIf="periscopeSessions.length > 0 else toolSessions">
+          <table class="table table-borderless">
+            <thead>
+              <tr>
+                <th tabindex="0">Runtime/ Diagnostic Id</th>
+                <th tabindex="0">Running Status</th>
+                <th tabindex="0">View Logs</th>
+                <th tabindex="0">Share With AKS</th>
+                <th tabindex="0"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let session of periscopeSessions">
+                <td tabindex="0"> {{ session.config.diagnosticRunId }} </td>
+                <td>
+                  <div *ngIf="session.status === sessionStatus.Running">
+                    <i class="fa fa-spinner fa-spin"></i> Running...
+                  </div>
+                  <div *ngIf="(session.status === sessionStatus.Error)">
+                    <i class="fa health-icon fa-times-circle unhealthy-icon-color"></i>
+                    <span> Timeout retrieving runCommand status. The job might still be running</span>
+                  </div>
+                  <div *ngIf="session.status === sessionStatus.Finished">
+                    <i class="fas health-icon fa-check"></i>
+                    <span> Completed</span>
+                  </div>
+                </td>
+                <td>
+                  <div *ngIf="(session.status !== sessionStatus.Running && session.status !== sessionStatus.Created)" (click)="openStorageContainerBlade(session)">
+                    <a tabindex="0" aria-label="view result">{{ session.config.containerName }} </a>
+                    <div>
+                      <span>not seeing logs? </span>
+                      <a tabindex="0" aria-label="retrive logs"  (click)="getPeriscopeLogs(session)"> Retrieve deployment logs </a>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div *ngIf="session.status === sessionStatus.Finished">
+                    <select [(ngModel)]="session.sharingConfig" >
+                      <option *ngFor="let option of sharingExpiryOptions" value="{{option[0]}}">{{ option[1] }}</option>
+                    </select>
+                  </div>
+                </td>
+                <td>
+                  <div *ngIf="session.status === sessionStatus.Finished">
+                    <button tabindex="0" type="button" class="btn btn-primary btn-sm" [disabled]="!session.sharingConfig" 
+                    (click)="sharePeriscopeSessionWithAKS(session)">  Share
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #toolSessions>
+          <fab-tooltip-host content="Only sessions available to AKS are displayed here" [directionalHint]="directionalHint" [tooltipOptions]="toolTipOptionsValue">
+            No known sessions.
+          </fab-tooltip-host>
+        </ng-template>
+      </div>
+      <div class="tool-tip-icon">
+        <div class="mr-2">
+          <div class="hover-text">
+            <img src="assets/img/azure-icons/AzureOptInsights.svg" alt="" class="linkCodeOptimizations">
           </div>
+          <span class="tooltip-text" id="right">
+            You can share with session result with AKS. You can specify how long AKS can access the logs. You can read 
+            our data privacy statement <a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/aks/command-invoke">here</a>.
+                  
+            <table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th scope="col">Log Sharing Timespan</th>
+                  <th scope="col">Use Cases</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let option of sharingExpiryOptions">
+                  <td class="text-left">{{ option[1] }}</td>
+                  <!-- <td class="text-left">{{ option[1] }}</td> -->
+                  <td class="text-left">{{ sharingExpiryOptionsToolTips[option[0]] }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </span>
         </div>
       </div>
     </collapsible-list-item>
